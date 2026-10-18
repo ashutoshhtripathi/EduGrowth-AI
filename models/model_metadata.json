@@ -1,0 +1,78 @@
+{
+  "model_version": "1.0.0-institutional",
+  "metrics": {
+    "risk_classifier": {
+      "accuracy": 0.9416666666666667,
+      "macro_f1": 0.9313064222757667,
+      "weighted_f1": 0.9417969950477497,
+      "confusion_matrix": [
+        [
+          299,
+          15,
+          0
+        ],
+        [
+          9,
+          211,
+          3
+        ],
+        [
+          0,
+          8,
+          55
+        ]
+      ]
+    },
+    "gpa_regressor": {
+      "mae": 0.2870328711718617,
+      "rmse": 0.3626157560584327,
+      "r2_score": 0.9091254941025082
+    }
+  },
+  "feature_columns": [
+    "semester",
+    "prior_hs_percentage",
+    "prev_cgpa",
+    "attendance_rate_pct",
+    "lms_weekly_hours",
+    "lms_logins_per_week",
+    "assignment_completion_pct",
+    "internal_assessment_score",
+    "backlog_count",
+    "credit_load",
+    "certifications_count",
+    "technical_skills_count",
+    "projects_count",
+    "github_activity_score",
+    "internship_completed",
+    "gpa_momentum",
+    "composite_engagement_index",
+    "vulnerability_index",
+    "practical_portfolio_score"
+  ],
+  "categorical_columns": [
+    "department"
+  ],
+  "top_feature_importances": {
+    "backlog_count": 0.15033333333333332,
+    "attendance_rate_pct": 0.12233333333333334,
+    "vulnerability_index": 0.10199999999999998,
+    "internal_assessment_score": 0.06599999999999999,
+    "prev_cgpa": 0.02566666666666666,
+    "assignment_completion_pct": 0.0043333333333333,
+    "technical_skills_count": 0.0033333333333333435,
+    "lms_logins_per_week": 0.0023333333333333426,
+    "projects_count": 0.0013333333333333196,
+    "practical_portfolio_score": 0.000666666666666682,
+    "composite_engagement_index": 0.000333333333333341,
+    "internship_completed": -0.000333333333333341,
+    "prior_hs_percentage": -0.001333333333333342,
+    "semester": -0.0016666666666666386,
+    "certifications_count": -0.0020000000000000018,
+    "credit_load": -0.002666666666666662,
+    "github_activity_score": -0.0033333333333333214,
+    "department": -0.0040000000000000036,
+    "gpa_momentum": -0.0050000000000000044,
+    "lms_weekly_hours": -0.005666666666666686
+  }
+}
