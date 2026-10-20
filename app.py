@@ -810,6 +810,147 @@ def render_authenticated_window(current_user):
         for r in diag['prescribed_interventions']:
             st.info(f"💡 {r}")
 
+        # ----------------------------------------------------------------------
+        # Student Passing & Failure Risk Calculator
+        # ----------------------------------------------------------------------
+        st.write("")
+        st.markdown("##### **🎯 Passing & Failure Risk Calculator**")
+        st.caption("Adjust your attendance, internal assessment marks, and weekly study hours below to simulate your real-time passing and failure probabilities.")
+
+        st.markdown('<div class="info-panel" style="padding: 1.5rem 1.8rem; margin-top: 0.5rem; margin-bottom: 1.5rem;">', unsafe_allow_html=True)
+        
+        c_input_col, c_result_col = st.columns([1.1, 1.3], gap="large")
+        
+        with c_input_col:
+            st.markdown("<p style='font-size:0.92rem; font-weight:700; color:#0F172A; margin-bottom:0.75rem;'>⚙️ Adjust Your Performance Parameters:</p>", unsafe_allow_html=True)
+            
+            calc_attendance = st.slider(
+                "Class Attendance Rate (%)",
+                min_value=30.0,
+                max_value=100.0,
+                value=float(s_row['attendance_rate_pct']),
+                step=1.0,
+                help="Institutional minimum compliance threshold is 75%."
+            )
+            
+            calc_internal = st.slider(
+                "Internal Exam Marks (/100)",
+                min_value=10.0,
+                max_value=100.0,
+                value=float(s_row['internal_assessment_score']),
+                step=1.0,
+                help="Continuous assessment, mid-term, and quiz scores."
+            )
+            
+            calc_study_hours = st.slider(
+                "Weekly Study / LMS Hours (hrs/wk)",
+                min_value=1.0,
+                max_value=35.0,
+                value=float(s_row['lms_weekly_hours']),
+                step=0.5,
+                help="Hours dedicated weekly to studying uploaded course materials."
+            )
+            
+            calc_assignment = st.slider(
+                "Assignment Submission Rate (%)",
+                min_value=20.0,
+                max_value=100.0,
+                value=float(s_row['assignment_completion_pct']),
+                step=1.0,
+                help="Percentage of homework and assignments submitted on schedule."
+            )
+            
+        with c_result_col:
+            # Construct feature dictionary reflecting adjusted parameters
+            calc_dict = s_row.to_dict()
+            calc_dict['attendance_rate_pct'] = calc_attendance
+            calc_dict['internal_assessment_score'] = calc_internal
+            calc_dict['lms_weekly_hours'] = calc_study_hours
+            calc_dict['assignment_completion_pct'] = calc_assignment
+            calc_dict['lms_logins_per_week'] = int(calc_study_hours * 1.6)
+            
+            # Real-time ML inference
+            calc_res = predictor.predict_single(calc_dict)
+            
+            fail_prob = float(calc_res['risk_probabilities']['High Risk'])
+            pass_prob = round(100.0 - fail_prob, 1)
+            calc_pred_gpa = calc_res['predicted_end_term_gpa']
+            
+            st.markdown("<p style='font-size:0.92rem; font-weight:700; color:#0F172A; margin-bottom:0.75rem;'>📊 Predicted Academic Outcome:</p>", unsafe_allow_html=True)
+            
+            # Status Indicator
+            if pass_prob >= 80.0:
+                status_html = f'<div class="status-pill pill-safe" style="font-size:0.85rem; padding:0.4rem 0.85rem;">🟢 High Passing Probability ({pass_prob}%) • Safe Standing</div>'
+            elif pass_prob >= 50.0:
+                status_html = f'<div class="status-pill pill-warning" style="font-size:0.85rem; padding:0.4rem 0.85rem;">🟡 Moderate Passing Probability ({pass_prob}%) • Advisory Needed</div>'
+            else:
+                status_html = f'<div class="status-pill pill-critical" style="font-size:0.85rem; padding:0.4rem 0.85rem;">🔴 High Failure Risk ({fail_prob}%) • Critical Action Required</div>'
+            
+            st.markdown(status_html, unsafe_allow_html=True)
+            st.write("")
+            
+            res_c1, res_c2, res_c3 = st.columns(3)
+            with res_c1:
+                st.markdown(f"""
+                <div class="clean-card" style="border-top: 3px solid #16A34A; padding:0.85rem 1rem;">
+                    <div class="card-label">Passing Chance</div>
+                    <div class="card-number" style="color:#16A34A; font-size:1.55rem;">{pass_prob}%</div>
+                    <div class="card-detail">Course Clearance</div>
+                </div>
+                """, unsafe_allow_html=True)
+            with res_c2:
+                st.markdown(f"""
+                <div class="clean-card" style="border-top: 3px solid #DC2626; padding:0.85rem 1rem;">
+                    <div class="card-label">Failing Risk</div>
+                    <div class="card-number" style="color:#DC2626; font-size:1.55rem;">{fail_prob}%</div>
+                    <div class="card-detail">Arrear / Probation Risk</div>
+                </div>
+                """, unsafe_allow_html=True)
+            with res_c3:
+                st.markdown(f"""
+                <div class="clean-card" style="border-top: 3px solid #2563EB; padding:0.85rem 1rem;">
+                    <div class="card-label">Forecasted GPA</div>
+                    <div class="card-number" style="color:#2563EB; font-size:1.55rem;">{calc_pred_gpa:.2f}</div>
+                    <div class="card-detail">Target 10-Pt Benchmark</div>
+                </div>
+                """, unsafe_allow_html=True)
+                
+            # Clean Comparison Chart
+            prob_chart_df = pd.DataFrame({
+                'Outcome': ['Passing Probability', 'Failing Risk'],
+                'Probability (%)': [pass_prob, fail_prob]
+            })
+            fig_calc = px.bar(
+                prob_chart_df,
+                x='Probability (%)',
+                y='Outcome',
+                orientation='h',
+                color='Outcome',
+                color_discrete_map={'Passing Probability': '#16A34A', 'Failing Risk': '#DC2626'},
+                text_auto='.1f',
+                height=160
+            )
+            fig_calc = apply_clean_chart_theme(fig_calc, height=160)
+            fig_calc.update_layout(
+                showlegend=False,
+                xaxis=dict(range=[0, 100], showgrid=True, gridcolor="#F1F5F9"),
+                yaxis=dict(title=None),
+                margin=dict(l=10, r=10, t=10, b=10)
+            )
+            st.plotly_chart(fig_calc, use_container_width=True)
+            
+            # Actionable Feedback
+            if calc_attendance < 75.0:
+                st.warning(f"⚠️ **Attendance Alert:** Your simulated attendance ({calc_attendance:.0f}%) is below the university threshold (75%). Raising it above 75% will dramatically lower your failure probability.")
+            elif calc_internal < 50.0:
+                st.warning(f"⚠️ **Internal Marks Advisory:** Internal score ({calc_internal:.0f}/100) is low. Scoring 60+ on subsequent quizzes/tests creates a comfortable buffer.")
+            elif calc_study_hours < 5.0:
+                st.info(f"💡 **Study Habit:** Increasing study time from {calc_study_hours:.1f} to 8+ hrs/week significantly boosts predicted GPA.")
+            else:
+                st.success("✅ **Optimal Trajectory:** With this combination of attendance, internals, and study hours, you have a strong buffer and high probability of passing with distinction!")
+                
+        st.markdown('</div>', unsafe_allow_html=True)
+
     # --------------------------------------------------------------------------
     # 4. PARENT / GUARDIAN DATA WINDOW
     # --------------------------------------------------------------------------
