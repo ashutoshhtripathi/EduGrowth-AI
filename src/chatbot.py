@@ -1,7 +1,7 @@
 """
-EduGrowth AI - Data Chatbot Assistant
+EduGrowth AI - Dynamic Data Chatbot Assistant
 Powered by Groq API using model openai/gpt-oss-120b.
-Enables natural language querying of the institutional student dataset (3,000 students)
+Enables natural language querying of ANY tabular dataset (CSV, Excel, or default cohort)
 with dynamic pandas execution and statistical synthesis.
 """
 
@@ -24,46 +24,6 @@ DEFAULT_GROQ_API_KEY = os.getenv(
 DEFAULT_MODEL = os.getenv("GROQ_MODEL", "openai/gpt-oss-120b")
 GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions"
 
-SYSTEM_PROMPT = """You are the EduGrowth AI Data Analyst & Institutional Assistant, powered by openai/gpt-oss-120b.
-You have direct access to the institutional student dataset via a pandas DataFrame named `df` (3,000 student records).
-
-### Dataset Schema & Column Reference:
-- `student_id` (str): Unique ID, e.g., 'EDG-2026-1042'
-- `student_name` (str): Full student name (e.g. 'Aarav Patel')
-- `department` (str): One of ['Computer Science', 'Information Tech', 'Data Science & AI', 'Electrical Eng', 'Mechanical Eng']
-- `semester` (int): 1 through 8
-- `prior_hs_percentage` (float): High-school mark percentage (0-100)
-- `prev_cgpa` (float): Cumulative GPA up to prior term (0.0 to 10.0)
-- `attendance_rate_pct` (float): Lecture attendance % (institutional requirement: >= 75%)
-- `lms_weekly_hours` (float): Digital study hours logged per week on LMS
-- `lms_logins_per_week` (int): Digital platform logins per week
-- `assignment_completion_pct` (float): Punctual assignment completion %
-- `internal_assessment_score` (float): Mid-term / internal score out of 100
-- `backlog_count` (int): Active uncleared course arrears / failed subjects
-- `credit_load` (int): Registered semester academic credits
-- `certifications_count` (int): Number of industry certifications completed
-- `technical_skills_count` (int): Verified technical skills count
-- `projects_count` (int): Completed practical and capstone projects
-- `github_activity_score` (float): Open-source & git repository activity score
-- `internship_completed` (int): 1 if industry internship done, 0 otherwise
-- `target_end_term_gpa` (float): Forecasted end-term GPA (0.0 to 10.0)
-- `academic_risk_level` (int):
-    0 = 'On Track (Low Risk)'
-    1 = 'Moderate Risk (Watchlist)'
-    2 = 'Critical Risk (Immediate Intervention)'
-- `employability_index` (float): Industry readiness composite score (0-100)
-- `gpa_momentum` (float): (internal_assessment_score / 10.0) - prev_cgpa
-- `composite_engagement_index` (float): Attendance + LMS hours + assignment punctuality composite (0-100)
-- `vulnerability_index` (float): Compound risk penalty for attendance < 75% combined with backlogs
-- `practical_portfolio_score` (float): Quantified technical portfolio index (0-100)
-
-### Guidelines:
-1. When asked about counts, averages, specific students, departments, risk cohorts, or rankings, ALWAYS use the `query_dataset` function to compute the exact ground truth numbers from `df`.
-2. Format answers with clean markdown (bold numbers, bullet points, concise tables where helpful).
-3. If user specifies a name (e.g., 'Aarav Patel') or student ID (e.g., 'EDG-2026-1042'), filter `df` specifically for that student.
-4. Provide context and actionable educational insights alongside raw numbers.
-"""
-
 TOOLS_SPEC = [
     {
         "type": "function",
@@ -85,11 +45,68 @@ TOOLS_SPEC = [
 ]
 
 class EduGrowthChatbot:
-    def __init__(self, df: pd.DataFrame, api_key: str = None, model: str = None):
+    def __init__(self, df: pd.DataFrame, api_key: str = None, model: str = None, dataset_name: str = "Institutional Student Cohort"):
         self.df = df
+        self.dataset_name = dataset_name
         self.api_key = api_key or DEFAULT_GROQ_API_KEY
         self.model = model or DEFAULT_MODEL
         
+    def update_dataset(self, df: pd.DataFrame, dataset_name: str = "Uploaded Dataset"):
+        """Swaps the active dataset and updates schema representation dynamically."""
+        self.df = df
+        self.dataset_name = dataset_name
+
+    def get_system_prompt(self) -> str:
+        """Dynamically generates a rich, precise schema description for whatever dataframe is active."""
+        num_rows, num_cols = self.df.shape
+        lines = [
+            f"You are the EduGrowth AI Data Analyst & Institutional Assistant, powered by openai/gpt-oss-120b.",
+            f"You have direct query access to a pandas DataFrame named `df` representing the active dataset '{self.dataset_name}'.",
+            f"\n### Active Dataset Profile:",
+            f"- Dataset Name: {self.dataset_name}",
+            f"- Total Rows: {num_rows:,}",
+            f"- Total Columns: {num_cols}",
+            f"\n### Complete Column Schema & Value Distributions:"
+        ]
+        
+        for col in self.df.columns:
+            dtype_str = str(self.df[col].dtype)
+            null_count = int(self.df[col].isnull().sum())
+            null_info = f", {null_count} nulls" if null_count > 0 else " (no nulls)"
+            
+            if pd.api.types.is_numeric_dtype(self.df[col]):
+                clean_s = self.df[col].dropna()
+                if len(clean_s) > 0:
+                    min_v = round(float(clean_s.min()), 2)
+                    max_v = round(float(clean_s.max()), 2)
+                    mean_v = round(float(clean_s.mean()), 2)
+                    lines.append(f"- `{col}` ({dtype_str}): numeric, range=[{min_v} to {max_v}], mean={mean_v}{null_info}")
+                else:
+                    lines.append(f"- `{col}` ({dtype_str}): numeric (all null values)")
+            else:
+                uniques = int(self.df[col].nunique())
+                sample_vals = [str(x) for x in self.df[col].dropna().unique()[:5]]
+                if uniques <= 10:
+                    lines.append(f"- `{col}` ({dtype_str}): categorical ({uniques} categories: {sample_vals}){null_info}")
+                else:
+                    lines.append(f"- `{col}` ({dtype_str}): text/identifier ({uniques} unique values, samples: {sample_vals}){null_info}")
+                    
+        # Check for educational / student dataset domain columns
+        if 'academic_risk_level' in self.df.columns:
+            lines.append("\n### Domain Guidelines:")
+            lines.append("- `academic_risk_level`: 0 = 'On Track (Low Risk)', 1 = 'Moderate Risk (Watchlist)', 2 = 'Critical Risk (Immediate Intervention)'")
+        if 'attendance_rate_pct' in self.df.columns:
+            lines.append("- Institutional lecture attendance benchmark is 75%. Below 75% indicates attendance deficit.")
+
+        lines.append("""
+### Analytical Directives:
+1. When asked about counts, percentages, averages, correlations, distributions, outliers, rankings, top/bottom records, or filtering, ALWAYS call the `query_dataset` function to compute the real result directly from `df`.
+2. Format your response in clean markdown with bold numbers, key metric cards or bullet points, and neat markdown tables where appropriate.
+3. If the user refers to a specific name, identifier, or category, filter `df` specifically for that item.
+4. Provide actionable insights, context, and clear takeaways alongside numerical answers.
+""")
+        return "\n".join(lines)
+
     def _execute_code(self, code: str) -> str:
         """Safely executes the pandas query on df and returns stringified result."""
         # Sanitize code for security
@@ -133,7 +150,7 @@ class EduGrowthChatbot:
                 "executed_queries": []
             }
             
-        system_content = SYSTEM_PROMPT
+        system_content = self.get_system_prompt()
         if role_context:
             system_content += f"\n\n### Current User Context:\n{role_context}"
             

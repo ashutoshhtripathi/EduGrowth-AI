@@ -1072,34 +1072,137 @@ def render_role_dashboard(current_user, filter_dept="All Departments", filter_se
 # AI DATA CHATBOT INTERFACE (GROQ OPENAI/GPT-OSS-120B)
 # ==============================================================================
 def render_chatbot_interface(current_user, chatbot, df):
-    """Interactive conversational analytics engine powered by Groq openai/gpt-oss-120b."""
+    """Interactive conversational analytics engine powered by Groq openai/gpt-oss-120b with custom dataset upload."""
     user_role = current_user.get("role", "guest")
     
+    # Session state for custom dataset
+    if "custom_df" not in st.session_state:
+        st.session_state["custom_df"] = None
+    if "custom_dataset_name" not in st.session_state:
+        st.session_state["custom_dataset_name"] = None
+    if "dataset_source" not in st.session_state:
+        st.session_state["dataset_source"] = "institutional"
+        
+    is_custom = (st.session_state["dataset_source"] == "custom" and st.session_state["custom_df"] is not None)
+    active_df = st.session_state["custom_df"] if is_custom else df
+    active_name = st.session_state["custom_dataset_name"] if is_custom else "Institutional Student Cohort"
+    
+    # Synchronize chatbot instance
+    chatbot.update_dataset(active_df, active_name)
+    
     # Header Banner
-    st.markdown("""
-    <div style="background: linear-gradient(135deg, #1E3A8A 0%, #1E40AF 50%, #2563EB 100%); border-radius: 10px; padding: 1.25rem 1.5rem; color: #FFFFFF; margin-bottom: 1.2rem; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.08);">
+    st.markdown(f"""
+    <div style="background: linear-gradient(135deg, #1E3A8A 0%, #1E40AF 50%, #2563EB 100%); border-radius: 10px; padding: 1.25rem 1.5rem; color: #FFFFFF; margin-bottom: 1rem; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.08);">
         <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
             <div>
                 <h3 style="margin: 0; color: #FFFFFF; font-weight: 700; font-size: 1.35rem;">💬 EduGrowth AI Data Assistant</h3>
                 <p style="margin: 0.35rem 0 0 0; color: #DBEAFE; font-size: 0.88rem;">
-                    Ask questions about academic cohorts, risk indicators, attendance, test scores, or individual student trajectories.
+                    Natural language analytics with verified Pandas query execution on any dataset.
                 </p>
             </div>
-            <div style="display: flex; gap: 8px;">
+            <div style="display: flex; gap: 8px; flex-wrap: wrap;">
                 <span style="background-color: rgba(255,255,255,0.18); border: 1px solid rgba(255,255,255,0.3); border-radius: 6px; padding: 0.35rem 0.65rem; font-size: 0.78rem; font-weight: 600;">
                     ⚡ Groq: openai/gpt-oss-120b
                 </span>
                 <span style="background-color: rgba(255,255,255,0.18); border: 1px solid rgba(255,255,255,0.3); border-radius: 6px; padding: 0.35rem 0.65rem; font-size: 0.78rem; font-weight: 600;">
-                    📊 3,000 Verified Students
+                    📊 Active: {active_name} ({len(active_df):,} Rows × {len(active_df.columns)} Cols)
                 </span>
             </div>
         </div>
     </div>
     """, unsafe_allow_html=True)
     
-    # Suggestion Chips by Role
+    # Dataset Source & Upload Controller
+    with st.expander("📁 **Dataset Source & File Upload (Use Default or Upload Your Own CSV/Excel)**", expanded=(st.session_state["dataset_source"] == "custom" and not is_custom)):
+        src_c1, src_c2 = st.columns([1.3, 2.2])
+        with src_c1:
+            st.markdown("##### **Select Dataset Source**")
+            src_mode = st.radio(
+                "Source:",
+                ["🏫 Default Institutional Cohort (3,000 Students)", "📤 Upload My Own Dataset (CSV / Excel)"],
+                index=0 if st.session_state["dataset_source"] == "institutional" else 1,
+                label_visibility="collapsed"
+            )
+            
+            if src_mode.startswith("🏫") and st.session_state["dataset_source"] != "institutional":
+                st.session_state["dataset_source"] = "institutional"
+                st.session_state["chat_messages"].append({
+                    "role": "assistant",
+                    "content": "🔄 **Switched active dataset back to Institutional Student Cohort** (3,000 students across 5 engineering departments). You can now ask questions about the institutional cohort.",
+                    "queries": []
+                })
+                st.rerun()
+            elif src_mode.startswith("📤") and st.session_state["dataset_source"] != "custom":
+                st.session_state["dataset_source"] = "custom"
+                st.rerun()
+
+        with src_c2:
+            if st.session_state["dataset_source"] == "custom":
+                st.markdown("##### **Upload Your Custom Dataset**")
+                up_file = st.file_uploader(
+                    "Upload CSV or Excel file",
+                    type=["csv", "xlsx", "xls"],
+                    help="Upload any tabular dataset. The chatbot will dynamically map its schema and answer questions according to your data.",
+                    label_visibility="collapsed"
+                )
+                if up_file is not None:
+                    if st.session_state.get("custom_dataset_name") != up_file.name:
+                        try:
+                            if up_file.name.endswith(".csv"):
+                                try:
+                                    loaded_df = pd.read_csv(up_file, encoding="utf-8")
+                                except UnicodeDecodeError:
+                                    up_file.seek(0)
+                                    loaded_df = pd.read_csv(up_file, encoding="latin1")
+                            else:
+                                loaded_df = pd.read_excel(up_file)
+                                
+                            if len(loaded_df) == 0:
+                                st.warning("⚠️ The uploaded file contains no rows of data.")
+                            else:
+                                st.session_state["custom_df"] = loaded_df
+                                st.session_state["custom_dataset_name"] = up_file.name
+                                cols_preview = ', '.join([f'`{c}`' for c in list(loaded_df.columns)[:6]])
+                                if len(loaded_df.columns) > 6:
+                                    cols_preview += f" ... (+{len(loaded_df.columns)-6} more)"
+                                st.session_state["chat_messages"].append({
+                                    "role": "assistant",
+                                    "content": f"📁 **Custom dataset `{up_file.name}` uploaded and activated!**\n\n- **Dimensions:** {len(loaded_df):,} rows × {len(loaded_df.columns)} columns\n- **Columns detected:** {cols_preview}\n\nI have dynamically analyzed this dataset's schema. You can now ask me anything about this data!",
+                                    "queries": []
+                                })
+                                st.rerun()
+                        except Exception as e:
+                            st.error(f"Error loading file: {str(e)}")
+            else:
+                st.info("Currently querying the pre-loaded **Institutional Student Cohort** (3,000 records). Select **'Upload My Own Dataset'** to analyze custom data.")
+
+        # Preview active custom dataset
+        if is_custom:
+            st.divider()
+            st.markdown(f"**Dataset Preview:** `{active_name}` ({len(active_df):,} rows × {len(active_df.columns)} columns)")
+            st.dataframe(active_df.head(5), use_container_width=True)
+            if st.button("🔄 Reset to Default Institutional Dataset", key="btn_reset_dataset"):
+                st.session_state["dataset_source"] = "institutional"
+                st.session_state["custom_df"] = None
+                st.session_state["custom_dataset_name"] = None
+                st.rerun()
+
+    # Suggestion Chips
     st.markdown("##### **⚡ Quick Analytics Questions**")
-    if user_role == "executive":
+    if is_custom:
+        num_cols = [c for c in active_df.columns if pd.api.types.is_numeric_dtype(active_df[c])]
+        cat_cols = [c for c in active_df.columns if not pd.api.types.is_numeric_dtype(active_df[c])]
+        
+        first_num = num_cols[0] if num_cols else None
+        first_cat = cat_cols[0] if cat_cols else None
+        
+        sample_questions = [
+            f"Provide a comprehensive summary and key trends in this dataset ({active_name}).",
+            f"What is the average, min, and max of `{first_num}`?" if first_num else "What are the key statistical distributions in this dataset?",
+            f"Show the breakdown and counts grouped by `{first_cat}`." if first_cat else "Are there any correlations or patterns across columns?",
+            "Check for missing values, null counts, or anomalies across all columns."
+        ]
+    elif user_role == "executive":
         sample_questions = [
             "Which department has the highest number of critical risk students?",
             "What is the average attendance and forecasted GPA across all 5 departments?",
@@ -1146,7 +1249,7 @@ def render_chatbot_interface(current_user, chatbot, df):
             st.session_state["chat_messages"] = [
                 {
                     "role": "assistant",
-                    "content": "👋 Conversation cleared! What would you like to analyze about the student cohort data?",
+                    "content": f"👋 Conversation cleared! What would you like to analyze about **{active_name}**?",
                     "queries": []
                 }
             ]
@@ -1171,7 +1274,7 @@ def render_chatbot_interface(current_user, chatbot, df):
                             st.code(q["output"], language="text")
 
     # Chat Input Handling
-    user_input = st.chat_input("Ask any question about students, grades, attendance, risk factors, or departments...")
+    user_input = st.chat_input(f"Ask any question about {active_name}...")
     prompt_to_send = selected_quick_prompt or user_input
     
     if prompt_to_send:
@@ -1186,9 +1289,11 @@ def render_chatbot_interface(current_user, chatbot, df):
             st.markdown(prompt_to_send)
             
         with st.chat_message("assistant", avatar="🎓"):
-            with st.spinner("Analyzing institutional dataset with Groq openai/gpt-oss-120b..."):
+            with st.spinner(f"Analyzing {active_name} with Groq openai/gpt-oss-120b..."):
                 # Prepare role context
-                if user_role == "executive":
+                if is_custom:
+                    role_ctx = f"Logged in as {current_user.get('name', 'User')} ({current_user.get('role_title', 'User')}). Active dataset: '{active_name}' ({len(active_df):,} rows × {len(active_df.columns)} columns)."
+                elif user_role == "executive":
                     role_ctx = f"Logged in as {current_user['name']} ({current_user['role_title']}). Access level: Complete institutional portfolio (all 3,000 students)."
                 elif user_role == "faculty":
                     role_ctx = f"Logged in as {current_user['name']} ({current_user['role_title']}). Assigned Department: {current_user['department']}, Semester: {current_user['semester']}."
