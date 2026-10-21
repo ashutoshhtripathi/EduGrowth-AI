@@ -373,10 +373,9 @@ def load_system():
     df['student_name'] = names
     
     predictor = EduGrowthPredictor()
-    chatbot = EduGrowthChatbot(df)
-    return df, predictor, chatbot
+    return df, predictor
 
-df, predictor, chatbot = load_system()
+df, predictor = load_system()
 
 # User Credentials Database
 ACCOUNTS_DB = {
@@ -1071,24 +1070,30 @@ def render_role_dashboard(current_user, filter_dept="All Departments", filter_se
 # ==============================================================================
 # AI DATA CHATBOT INTERFACE (GROQ OPENAI/GPT-OSS-120B)
 # ==============================================================================
-def render_chatbot_interface(current_user, chatbot, df):
-    """Interactive conversational analytics engine powered by Groq openai/gpt-oss-120b with custom dataset upload."""
+def render_chatbot_interface(current_user, df):
+    """Interactive conversational analytics engine powered by Groq with dynamic custom dataset support and visual exploration."""
     user_role = current_user.get("role", "guest")
     
-    # Session state for custom dataset
+    # Session state for custom dataset & model
     if "custom_df" not in st.session_state:
         st.session_state["custom_df"] = None
     if "custom_dataset_name" not in st.session_state:
         st.session_state["custom_dataset_name"] = None
     if "dataset_source" not in st.session_state:
         st.session_state["dataset_source"] = "institutional"
+    if "selected_model" not in st.session_state:
+        st.session_state["selected_model"] = "openai/gpt-oss-120b"
         
     is_custom = (st.session_state["dataset_source"] == "custom" and st.session_state["custom_df"] is not None)
     active_df = st.session_state["custom_df"] if is_custom else df
     active_name = st.session_state["custom_dataset_name"] if is_custom else "Institutional Student Cohort"
     
-    # Synchronize chatbot instance
-    chatbot.update_dataset(active_df, active_name)
+    # Freshly instantiate chatbot on active dataframe (prevents stale caching issues)
+    chatbot = EduGrowthChatbot(
+        active_df,
+        dataset_name=active_name,
+        model=st.session_state["selected_model"]
+    )
     
     # Header Banner
     st.markdown(f"""
@@ -1097,12 +1102,12 @@ def render_chatbot_interface(current_user, chatbot, df):
             <div>
                 <h3 style="margin: 0; color: #FFFFFF; font-weight: 700; font-size: 1.35rem;">💬 EduGrowth AI Data Assistant</h3>
                 <p style="margin: 0.35rem 0 0 0; color: #DBEAFE; font-size: 0.88rem;">
-                    Natural language analytics with verified Pandas query execution on any dataset.
+                    Natural language analytics with verified Pandas execution on default or custom datasets.
                 </p>
             </div>
             <div style="display: flex; gap: 8px; flex-wrap: wrap;">
                 <span style="background-color: rgba(255,255,255,0.18); border: 1px solid rgba(255,255,255,0.3); border-radius: 6px; padding: 0.35rem 0.65rem; font-size: 0.78rem; font-weight: 600;">
-                    ⚡ Groq: openai/gpt-oss-120b
+                    ⚡ Groq: {st.session_state['selected_model']}
                 </span>
                 <span style="background-color: rgba(255,255,255,0.18); border: 1px solid rgba(255,255,255,0.3); border-radius: 6px; padding: 0.35rem 0.65rem; font-size: 0.78rem; font-weight: 600;">
                     📊 Active: {active_name} ({len(active_df):,} Rows × {len(active_df.columns)} Cols)
@@ -1111,7 +1116,22 @@ def render_chatbot_interface(current_user, chatbot, df):
         </div>
     </div>
     """, unsafe_allow_html=True)
-    
+
+    # Top Settings Bar
+    ctrl_col1, ctrl_col2 = st.columns([1.5, 2.5])
+    with ctrl_col1:
+        model_options = ["openai/gpt-oss-120b", "openai/gpt-oss-20b", "qwen/qwen3.8-27b"]
+        current_idx = model_options.index(st.session_state["selected_model"]) if st.session_state["selected_model"] in model_options else 0
+        new_model = st.selectbox(
+            "🧠 AI Inference Model (Groq LPU):",
+            model_options,
+            index=current_idx,
+            help="Select the model powering data inquiries. openai/gpt-oss-120b is the flagship model with maximum reasoning capacity."
+        )
+        if new_model != st.session_state["selected_model"]:
+            st.session_state["selected_model"] = new_model
+            st.rerun()
+
     # Dataset Source & Upload Controller
     with st.expander("📁 **Dataset Source & File Upload (Use Default or Upload Your Own CSV/Excel)**", expanded=(st.session_state["dataset_source"] == "custom" and not is_custom)):
         src_c1, src_c2 = st.columns([1.3, 2.2])
@@ -1187,12 +1207,107 @@ def render_chatbot_interface(current_user, chatbot, df):
                 st.session_state["custom_dataset_name"] = None
                 st.rerun()
 
-    # Suggestion Chips
-    st.markdown("##### **⚡ Quick Analytics Questions**")
-    if is_custom:
+    # --------------------------------------------------------------------------
+    # Interactive Data Profiler & Visual Studio
+    # --------------------------------------------------------------------------
+    with st.expander("📊 **Interactive Data Profiler & Visual Exploration Studio**", expanded=False):
+        dp_c1, dp_c2, dp_c3, dp_c4 = st.columns(4)
+        total_cells = active_df.shape[0] * active_df.shape[1]
+        null_cells = int(active_df.isnull().sum().sum())
+        completeness = ((total_cells - null_cells) / total_cells * 100) if total_cells else 100.0
         num_cols = [c for c in active_df.columns if pd.api.types.is_numeric_dtype(active_df[c])]
         cat_cols = [c for c in active_df.columns if not pd.api.types.is_numeric_dtype(active_df[c])]
         
+        with dp_c1:
+            st.metric("Total Records", f"{len(active_df):,}")
+        with dp_c2:
+            st.metric("Total Columns", f"{len(active_df.columns)}")
+        with dp_c3:
+            st.metric("Data Completeness", f"{completeness:.1f}%", f"{null_cells} null cells" if null_cells else "0 nulls")
+        with dp_c4:
+            st.metric("Memory Footprint", f"{active_df.memory_usage(deep=True).sum() / 1024:.1f} KB")
+
+        v_tab1, v_tab2, v_tab3, v_tab4 = st.tabs([
+            "📈 Numeric Distribution", 
+            "📊 Categorical Breakdown", 
+            "🔥 Correlation Matrix", 
+            "🔍 Search & Filter Data"
+        ])
+        
+        with v_tab1:
+            if num_cols:
+                col_sel = st.selectbox("Select Numeric Feature to Plot:", num_cols, key="viz_num_sel")
+                fig_dist = px.histogram(
+                    active_df,
+                    x=col_sel,
+                    marginal="box",
+                    nbins=30,
+                    color_discrete_sequence=["#2563EB"],
+                    title=f"Distribution & Spread of {col_sel}",
+                    height=320
+                )
+                fig_dist = apply_clean_chart_theme(fig_dist, height=320)
+                st.plotly_chart(fig_dist, use_container_width=True)
+            else:
+                st.info("No numeric columns detected in this dataset.")
+                
+        with v_tab2:
+            if cat_cols:
+                cat_sel = st.selectbox("Select Categorical Feature to Plot:", cat_cols, key="viz_cat_sel")
+                top_cats = active_df[cat_sel].value_counts().head(12).reset_index()
+                top_cats.columns = [cat_sel, 'Count']
+                fig_bar = px.bar(
+                    top_cats,
+                    x='Count',
+                    y=cat_sel,
+                    orientation='h',
+                    color_discrete_sequence=["#1E3A8A"],
+                    title=f"Top Categories in {cat_sel}",
+                    text_auto=True,
+                    height=320
+                )
+                fig_bar = apply_clean_chart_theme(fig_bar, height=320)
+                fig_bar.update_layout(yaxis=dict(autorange="reversed"))
+                st.plotly_chart(fig_bar, use_container_width=True)
+            else:
+                st.info("No categorical columns detected in this dataset.")
+                
+        with v_tab3:
+            if len(num_cols) >= 2:
+                corr_sub = active_df[num_cols[:15]].corr()
+                fig_corr = px.imshow(
+                    corr_sub,
+                    text_auto=".2f",
+                    color_continuous_scale="RdBu_r",
+                    zmin=-1,
+                    zmax=1,
+                    title="Feature Correlation Matrix (Top 15 Numeric Features)",
+                    height=420
+                )
+                fig_corr = apply_clean_chart_theme(fig_corr, height=420)
+                st.plotly_chart(fig_corr, use_container_width=True)
+            else:
+                st.info("Need at least 2 numeric columns to compute correlations.")
+                
+        with v_tab4:
+            search_query = st.text_input("Filter dataset rows by keyword:", placeholder="Type any search term...")
+            filtered_df = active_df.copy()
+            if search_query:
+                mask = filtered_df.astype(str).apply(lambda row: row.str.contains(search_query, case=False).any(), axis=1)
+                filtered_df = filtered_df[mask]
+            st.dataframe(filtered_df.head(25), use_container_width=True, height=280)
+            csv_export = filtered_df.to_csv(index=False).encode('utf-8')
+            st.download_button(
+                "📥 Download Filtered Slice (.csv)",
+                data=csv_export,
+                file_name="filtered_dataset_slice.csv",
+                mime="text/csv",
+                key="btn_download_filtered"
+            )
+
+    # Suggestion Chips
+    st.markdown("##### **⚡ Quick Analytics Questions & AI Actions**")
+    if is_custom:
         first_num = num_cols[0] if num_cols else None
         first_cat = cat_cols[0] if cat_cols else None
         
@@ -1242,9 +1357,29 @@ def render_chatbot_interface(current_user, chatbot, df):
             if st.button(f"💡 {q_text}", key=f"quick_q_{idx}", use_container_width=True):
                 selected_quick_prompt = q_text
 
-    # Action row (Clear chat)
-    act_col1, act_col2 = st.columns([6, 1])
+    # Action row (Export transcript & Clear chat)
+    act_col1, act_col2, act_col3 = st.columns([5, 2, 1.2])
     with act_col2:
+        # Build Markdown transcript for export
+        report_md = f"# EduGrowth AI Analytics Report\n\n"
+        report_md += f"**Dataset:** {active_name} ({len(active_df):,} rows x {len(active_df.columns)} columns)\n"
+        report_md += f"**Model:** {st.session_state['selected_model']}\n"
+        report_md += f"**User:** {current_user['name']} ({current_user.get('role_title', 'User')})\n\n---\n\n"
+        for m in st.session_state.get("chat_messages", []):
+            role_label = "👤 User" if m["role"] == "user" else "🎓 EduGrowth Assistant"
+            report_md += f"### {role_label}\n{m['content']}\n\n"
+            if m.get("queries"):
+                for q in m["queries"]:
+                    report_md += f"```python\n# Executed Pandas Query\n{q['code']}\n```\n"
+                    report_md += f"```text\n# Query Result\n{q['output']}\n```\n\n"
+        st.download_button(
+            "📥 Export Chat Report (.md)",
+            data=report_md.encode("utf-8"),
+            file_name=f"edugrowth_ai_report_{pd.Timestamp.now().strftime('%Y%m%d_%H%M%S')}.md",
+            mime="text/markdown",
+            use_container_width=True
+        )
+    with act_col3:
         if st.button("🗑️ Clear Chat", use_container_width=True):
             st.session_state["chat_messages"] = [
                 {
@@ -1289,7 +1424,7 @@ def render_chatbot_interface(current_user, chatbot, df):
             st.markdown(prompt_to_send)
             
         with st.chat_message("assistant", avatar="🎓"):
-            with st.spinner(f"Analyzing {active_name} with Groq openai/gpt-oss-120b..."):
+            with st.spinner(f"Analyzing {active_name} with Groq {st.session_state['selected_model']}..."):
                 # Prepare role context
                 if is_custom:
                     role_ctx = f"Logged in as {current_user.get('name', 'User')} ({current_user.get('role_title', 'User')}). Active dataset: '{active_name}' ({len(active_df):,} rows × {len(active_df.columns)} columns)."
@@ -1376,8 +1511,8 @@ def render_authenticated_window(current_user):
 
         st.divider()
         st.markdown("##### **🤖 AI Data Assistant**")
-        st.caption("Engine: `openai/gpt-oss-120b` (Groq)")
-        st.caption("Live Pandas Execution on 3,000 Students")
+        st.caption(f"Engine: `{st.session_state.get('selected_model', 'openai/gpt-oss-120b')}` (Groq)")
+        st.caption("Dynamic Query Execution & Visual Exploration")
         st.divider()
         st.caption("🔒 Verified Institutional Session | Model v1.0")
 
@@ -1388,7 +1523,8 @@ def render_authenticated_window(current_user):
         render_role_dashboard(current_user, filter_dept, filter_sem)
         
     with tab_chat:
-        render_chatbot_interface(current_user, chatbot, df)
+        render_chatbot_interface(current_user, df)
+
 
 # ==============================================================================
 # MAIN ROUTER
