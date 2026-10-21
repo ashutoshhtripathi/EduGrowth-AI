@@ -20,6 +20,7 @@ import plotly.graph_objects as go
 # Add src to sys.path
 sys.path.append(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'src'))
 from inference import EduGrowthPredictor
+from chatbot import EduGrowthChatbot
 
 # Page Configuration - Clean Light Theme
 st.set_page_config(
@@ -319,6 +320,44 @@ st.markdown("""
     div[data-baseweb="input"] svg {
         fill: #64748B !important;
     }
+
+    /* Tab Switcher Styling */
+    .stTabs [data-baseweb="tab-list"] {
+        gap: 8px;
+        background-color: #F1F5F9;
+        padding: 6px 8px;
+        border-radius: 8px;
+        border: 1px solid #E2E8F0;
+        margin-bottom: 1.25rem;
+    }
+    
+    .stTabs [data-baseweb="tab"] {
+        border-radius: 6px;
+        padding: 8px 18px;
+        font-weight: 600;
+        font-size: 0.92rem;
+        color: #475569 !important;
+        background-color: transparent !important;
+        border: none !important;
+    }
+    
+    .stTabs [aria-selected="true"] {
+        background-color: #FFFFFF !important;
+        color: #1E3A8A !important;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.08) !important;
+    }
+    
+    /* Chat Input Styling */
+    .stChatInputContainer {
+        border-radius: 8px !important;
+    }
+    
+    .stChatInput textarea {
+        color: #0F172A !important;
+        -webkit-text-fill-color: #0F172A !important;
+        background-color: #FFFFFF !important;
+        font-size: 0.95rem !important;
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -334,9 +373,10 @@ def load_system():
     df['student_name'] = names
     
     predictor = EduGrowthPredictor()
-    return df, predictor
+    chatbot = EduGrowthChatbot(df)
+    return df, predictor, chatbot
 
-df, predictor = load_system()
+df, predictor, chatbot = load_system()
 
 # User Credentials Database
 ACCOUNTS_DB = {
@@ -379,6 +419,15 @@ ACCOUNTS_DB = {
 if "authenticated" not in st.session_state:
     st.session_state["authenticated"] = False
     st.session_state["user"] = None
+
+if "chat_messages" not in st.session_state:
+    st.session_state["chat_messages"] = [
+        {
+            "role": "assistant",
+            "content": "👋 **Hello! I am your EduGrowth AI Data Assistant**, powered by Groq's `openai/gpt-oss-120b`.\n\nI have live query access to our institutional cohort of **3,000 students** across all engineering departments. You can ask me anything about:\n- Department-wide risk distributions & pass rates\n- Attendance correlations, course backlogs, and GPA projections\n- Specific student profiles (by name or ID like `EDG-2026-1042`)\n- Tailored intervention strategies and skill development\n\nHow can I help you analyze the data today?",
+            "queries": []
+        }
+    ]
 
 def apply_clean_chart_theme(fig, height=300):
     fig.update_layout(
@@ -440,51 +489,39 @@ def render_login_portal():
                 else:
                     st.error("Invalid credentials. Please verify your User ID and Password.")
                     
-        st.markdown("</div>", unsafe_allow_html=True)
-
-def render_authenticated_window(current_user):
-    """Renders the data window scoped strictly to the authenticated user's access level."""
-    user_role = current_user["role"]
-
-    # Sidebar - Session Management
-    with st.sidebar:
-        st.markdown("### **EduGrowth AI**")
-        st.caption("Active Session")
-        
-        st.markdown(f"""
-        <div style="background-color:#F1F5F9; border-radius:6px; padding:0.75rem 0.9rem; margin-bottom:1rem; border:1px solid #E2E8F0;">
-            <div style="font-size:0.88rem; font-weight:700; color:#0F172A;">{current_user['name']}</div>
-            <div style="font-size:0.76rem; color:#475569;">{current_user['role_title']}</div>
+        st.markdown("""
+        <div style="margin-top: 1rem; padding-top: 0.75rem; border-top: 1px dashed #CBD5E1; text-align: center;">
+            <p style="font-size: 0.78rem; font-weight: 600; color: #64748B; margin-bottom: 0.5rem; text-transform: uppercase; letter-spacing: 0.05em;">
+                ⚡ 1-Click Demo Login
+            </p>
         </div>
         """, unsafe_allow_html=True)
         
-        if st.button("🚪 Log Out", use_container_width=True):
-            st.session_state["authenticated"] = False
-            st.session_state["user"] = None
-            st.rerun()
-            
-        st.divider()
-        
-        if user_role == "executive":
-            st.markdown("##### **Executive Filters**")
-            filter_dept = st.selectbox("Department", ["All Departments"] + sorted(list(df['department'].unique())))
-            filter_sem = st.selectbox("Semester", ["All Semesters"] + sorted(list(df['semester'].unique())))
-            
-        elif user_role == "faculty":
-            st.markdown(f"##### **Assigned Class Scope**")
-            st.write(f"**Department:** {current_user['department']}")
-            st.write(f"**Semester:** {current_user['semester']}")
-            
-        elif user_role == "student":
-            st.markdown("##### **My Account**")
-            st.write(f"**Student ID:** {current_user['student_id']}")
-            
-        elif user_role == "parent":
-            st.markdown("##### **Child Profile**")
-            st.write(f"**Student ID:** {current_user['student_id']}")
+        demo_c1, demo_c2 = st.columns(2)
+        with demo_c1:
+            if st.button("🏛️ Dean Vance (Executive)", use_container_width=True):
+                st.session_state["authenticated"] = True
+                st.session_state["user"] = ACCOUNTS_DB["dean.vance"]
+                st.rerun()
+            if st.button("🎓 Aarav Patel (Student)", use_container_width=True):
+                st.session_state["authenticated"] = True
+                st.session_state["user"] = ACCOUNTS_DB["student.edg1042"]
+                st.rerun()
+        with demo_c2:
+            if st.button("👨‍🏫 Prof. Sharma (Faculty)", use_container_width=True):
+                st.session_state["authenticated"] = True
+                st.session_state["user"] = ACCOUNTS_DB["prof.sharma"]
+                st.rerun()
+            if st.button("👨‍👩‍👧 Mr. Patel (Parent)", use_container_width=True):
+                st.session_state["authenticated"] = True
+                st.session_state["user"] = ACCOUNTS_DB["parent.edg1042"]
+                st.rerun()
+                
+        st.markdown("</div>", unsafe_allow_html=True)
 
-        st.divider()
-        st.caption("🔒 Verified Institutional Session | Model v1.0")
+def render_role_dashboard(current_user, filter_dept="All Departments", filter_sem="All Semesters"):
+    """Renders the visual institutional dashboard scoped to the authenticated user's role."""
+    user_role = current_user["role"]
 
     # --------------------------------------------------------------------------
     # 1. EXECUTIVE / DEAN DATA WINDOW
@@ -1030,6 +1067,223 @@ def render_authenticated_window(current_user):
             st.markdown("##### **Communicate with Class Teacher**")
             if st.button("📞 Request Virtual Consultation with Prof. Arvind Sharma"):
                 st.success("Consultation request logged. Prof. Arvind Sharma will contact you via email within 24 hours.")
+
+# ==============================================================================
+# AI DATA CHATBOT INTERFACE (GROQ OPENAI/GPT-OSS-120B)
+# ==============================================================================
+def render_chatbot_interface(current_user, chatbot, df):
+    """Interactive conversational analytics engine powered by Groq openai/gpt-oss-120b."""
+    user_role = current_user.get("role", "guest")
+    
+    # Header Banner
+    st.markdown("""
+    <div style="background: linear-gradient(135deg, #1E3A8A 0%, #1E40AF 50%, #2563EB 100%); border-radius: 10px; padding: 1.25rem 1.5rem; color: #FFFFFF; margin-bottom: 1.2rem; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.08);">
+        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+            <div>
+                <h3 style="margin: 0; color: #FFFFFF; font-weight: 700; font-size: 1.35rem;">💬 EduGrowth AI Data Assistant</h3>
+                <p style="margin: 0.35rem 0 0 0; color: #DBEAFE; font-size: 0.88rem;">
+                    Ask questions about academic cohorts, risk indicators, attendance, test scores, or individual student trajectories.
+                </p>
+            </div>
+            <div style="display: flex; gap: 8px;">
+                <span style="background-color: rgba(255,255,255,0.18); border: 1px solid rgba(255,255,255,0.3); border-radius: 6px; padding: 0.35rem 0.65rem; font-size: 0.78rem; font-weight: 600;">
+                    ⚡ Groq: openai/gpt-oss-120b
+                </span>
+                <span style="background-color: rgba(255,255,255,0.18); border: 1px solid rgba(255,255,255,0.3); border-radius: 6px; padding: 0.35rem 0.65rem; font-size: 0.78rem; font-weight: 600;">
+                    📊 3,000 Verified Students
+                </span>
+            </div>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    # Suggestion Chips by Role
+    st.markdown("##### **⚡ Quick Analytics Questions**")
+    if user_role == "executive":
+        sample_questions = [
+            "Which department has the highest number of critical risk students?",
+            "What is the average attendance and forecasted GPA across all 5 departments?",
+            "How many students have more than 2 course backlogs?",
+            "List the top 5 students needing immediate intervention with their IDs and departments."
+        ]
+    elif user_role == "faculty":
+        dept = current_user.get("department", "Computer Science")
+        sem = current_user.get("semester", 5)
+        sample_questions = [
+            f"How many students in {dept} Semester {sem} have attendance below 75%?",
+            f"What is the average internal assessment score and backlog count in {dept}?",
+            f"Show the distribution of risk levels in {dept} Semester {sem}.",
+            f"Who are the top performers in {dept} with highest practical portfolio scores?"
+        ]
+    elif user_role == "student":
+        sid = current_user.get("student_id", "EDG-2026-1042")
+        sample_questions = [
+            f"Give me a detailed evaluation and diagnostic summary for student {sid}.",
+            f"What specific actions can student {sid} take to improve their end-term GPA?",
+            f"How does student {sid}'s attendance and internal score compare to class average?",
+            f"What skills and projects should student {sid} add to boost employability?"
+        ]
+    else: # Parent
+        sid = current_user.get("student_id", "EDG-2026-1042")
+        sample_questions = [
+            f"How is my child ({sid}) performing academically and what is their attendance?",
+            f"Are there any backlogs or critical risk warnings for student {sid}?",
+            f"What recommendations should we discuss with the class teacher?",
+            f"What are my child's strongest accomplishments this semester?"
+        ]
+        
+    cols = st.columns(len(sample_questions))
+    selected_quick_prompt = None
+    for idx, q_text in enumerate(sample_questions):
+        with cols[idx]:
+            if st.button(f"💡 {q_text}", key=f"quick_q_{idx}", use_container_width=True):
+                selected_quick_prompt = q_text
+
+    # Action row (Clear chat)
+    act_col1, act_col2 = st.columns([6, 1])
+    with act_col2:
+        if st.button("🗑️ Clear Chat", use_container_width=True):
+            st.session_state["chat_messages"] = [
+                {
+                    "role": "assistant",
+                    "content": "👋 Conversation cleared! What would you like to analyze about the student cohort data?",
+                    "queries": []
+                }
+            ]
+            st.rerun()
+
+    st.markdown("---")
+    
+    # Render Chat History
+    for msg in st.session_state.get("chat_messages", []):
+        if msg["role"] == "user":
+            with st.chat_message("user"):
+                st.markdown(msg["content"])
+        else:
+            with st.chat_message("assistant", avatar="🎓"):
+                st.markdown(msg["content"])
+                if msg.get("queries"):
+                    with st.expander("🔍 View Verified Pandas Query & Dataset Output", expanded=False):
+                        for q in msg["queries"]:
+                            st.caption("**Executed Query (Python):**")
+                            st.code(q["code"], language="python")
+                            st.caption("**Computed Dataset Result:**")
+                            st.code(q["output"], language="text")
+
+    # Chat Input Handling
+    user_input = st.chat_input("Ask any question about students, grades, attendance, risk factors, or departments...")
+    prompt_to_send = selected_quick_prompt or user_input
+    
+    if prompt_to_send:
+        # Add user message
+        st.session_state["chat_messages"].append({
+            "role": "user",
+            "content": prompt_to_send
+        })
+        
+        # Display immediately
+        with st.chat_message("user"):
+            st.markdown(prompt_to_send)
+            
+        with st.chat_message("assistant", avatar="🎓"):
+            with st.spinner("Analyzing institutional dataset with Groq openai/gpt-oss-120b..."):
+                # Prepare role context
+                if user_role == "executive":
+                    role_ctx = f"Logged in as {current_user['name']} ({current_user['role_title']}). Access level: Complete institutional portfolio (all 3,000 students)."
+                elif user_role == "faculty":
+                    role_ctx = f"Logged in as {current_user['name']} ({current_user['role_title']}). Assigned Department: {current_user['department']}, Semester: {current_user['semester']}."
+                elif user_role == "student":
+                    role_ctx = f"Logged in as {current_user['name']} (Student ID: {current_user['student_id']})."
+                elif user_role == "parent":
+                    role_ctx = f"Logged in as {current_user['name']} (Guardian of Student ID: {current_user['student_id']})."
+                else:
+                    role_ctx = f"Logged in as {current_user.get('name', 'User')}."
+                    
+                response_dict = chatbot.chat(
+                    messages=st.session_state["chat_messages"],
+                    role_context=role_ctx
+                )
+                
+                content = response_dict.get("content", "No response generated.")
+                queries = response_dict.get("executed_queries", [])
+                
+                st.markdown(content)
+                if queries:
+                    with st.expander("🔍 View Verified Pandas Query & Dataset Output", expanded=False):
+                        for q in queries:
+                            st.caption("**Executed Query (Python):**")
+                            st.code(q["code"], language="python")
+                            st.caption("**Computed Dataset Result:**")
+                            st.code(q["output"], language="text")
+                            
+        st.session_state["chat_messages"].append({
+            "role": "assistant",
+            "content": content,
+            "queries": queries
+        })
+        st.rerun()
+
+# ==============================================================================
+# AUTHENTICATED PORTAL WINDOW
+# ==============================================================================
+def render_authenticated_window(current_user):
+    """Renders top navigation tabs: Institutional Dashboard & AI Data Chatbot."""
+    user_role = current_user["role"]
+    filter_dept = "All Departments"
+    filter_sem = "All Semesters"
+
+    # Sidebar - Session Management
+    with st.sidebar:
+        st.markdown("### **EduGrowth AI**")
+        st.caption("Active Session")
+        
+        st.markdown(f"""
+        <div style="background-color:#F1F5F9; border-radius:6px; padding:0.75rem 0.9rem; margin-bottom:1rem; border:1px solid #E2E8F0;">
+            <div style="font-size:0.88rem; font-weight:700; color:#0F172A;">{current_user['name']}</div>
+            <div style="font-size:0.76rem; color:#475569;">{current_user['role_title']}</div>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        if st.button("🚪 Log Out", use_container_width=True):
+            st.session_state["authenticated"] = False
+            st.session_state["user"] = None
+            st.rerun()
+            
+        st.divider()
+        
+        if user_role == "executive":
+            st.markdown("##### **Executive Filters**")
+            filter_dept = st.selectbox("Department", ["All Departments"] + sorted(list(df['department'].unique())))
+            filter_sem = st.selectbox("Semester", ["All Semesters"] + sorted(list(df['semester'].unique())))
+            
+        elif user_role == "faculty":
+            st.markdown("##### **Assigned Class Scope**")
+            st.write(f"**Department:** {current_user['department']}")
+            st.write(f"**Semester:** {current_user['semester']}")
+            
+        elif user_role == "student":
+            st.markdown("##### **My Account**")
+            st.write(f"**Student ID:** {current_user['student_id']}")
+            
+        elif user_role == "parent":
+            st.markdown("##### **Child Profile**")
+            st.write(f"**Student ID:** {current_user['student_id']}")
+
+        st.divider()
+        st.markdown("##### **🤖 AI Data Assistant**")
+        st.caption("Engine: `openai/gpt-oss-120b` (Groq)")
+        st.caption("Live Pandas Execution on 3,000 Students")
+        st.divider()
+        st.caption("🔒 Verified Institutional Session | Model v1.0")
+
+    # Main Tab Router
+    tab_dash, tab_chat = st.tabs(["📊 Institutional Dashboard", "🤖 AI Data Chatbot (Groq GPT OSS 120B)"])
+    
+    with tab_dash:
+        render_role_dashboard(current_user, filter_dept, filter_sem)
+        
+    with tab_chat:
+        render_chatbot_interface(current_user, chatbot, df)
 
 # ==============================================================================
 # MAIN ROUTER
