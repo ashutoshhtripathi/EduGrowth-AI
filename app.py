@@ -1,28 +1,38 @@
 """
 EduGrowth AI - Intelligent Student Success & Retention Monitoring System
-Institutional Portal with Secure Role-Based Authentication:
-- Executive / Dean: Complete institutional student body analytics
-- Faculty / Teacher: Class-level monitoring & academic interventions
-- Student: Individual academic trajectory & skills portfolio
-- Parent: Child attendance tracking & success monitoring
+Institutional Access Portal with Secure Role-Based Authentication:
+- Executive / Dean: Institutional cohort analytics, department benchmarks, intervention council
+- Faculty / Teacher: Class-level monitoring, student audits & pedagogical action tracking
+- Student: Individual academic trajectory, reverse GPA goal optimizer & career pathways
+- Parent: Transparent attendance monitoring, achievement highlights & advisor scheduling
+- AI Data Assistant: Powered by Groq (openai/gpt-oss-120b) with dynamic Pandas execution
 """
 
 import os
 import sys
 import json
 import hashlib
+from datetime import datetime
 import pandas as pd
 import numpy as np
 import streamlit as st
 import plotly.express as px
 import plotly.graph_objects as go
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
 
 # Add src to sys.path
 sys.path.append(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'src'))
 from inference import EduGrowthPredictor
 from chatbot import EduGrowthChatbot
+from goal_optimizer import optimize_gpa_target
+from interventions_manager import get_initial_interventions, create_intervention
+from letter_generator import generate_academic_letter
+from career_recommender import evaluate_career_readiness
 
-# Page Configuration - Clean Light Theme
+# Page Configuration - Clean Professional Enterprise Light Theme
 st.set_page_config(
     page_title="EduGrowth AI | Institutional Access Portal",
     page_icon="🎓",
@@ -45,7 +55,7 @@ def get_student_identity(student_id_str):
     parent_name = f"Mr. & Mrs. {last_name}"
     return full_name, parent_name
 
-# Enterprise Light Theme Styling
+# Enterprise Light Theme Styling - Simple, Crisp & Professional
 st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
@@ -126,7 +136,7 @@ st.markdown("""
         font-weight: 600;
     }
     
-    /* Metrics */
+    /* Clean Metric Cards */
     .clean-card {
         background-color: #FFFFFF;
         border: 1px solid #E2E8F0;
@@ -134,6 +144,11 @@ st.markdown("""
         padding: 1.1rem 1.25rem;
         box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.03);
         margin-bottom: 0.8rem;
+        transition: transform 0.15s ease, box-shadow 0.15s ease;
+    }
+    
+    .clean-card:hover {
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.06);
     }
     
     .card-label {
@@ -192,7 +207,7 @@ st.markdown("""
         border-right: 1px solid #E2E8F0 !important;
     }
 
-    /* Fix Dark Blocks: Force Inputs to Crisp White Background & Dark Legible Text */
+    /* Crisp Inputs */
     div[data-baseweb="input"],
     div[data-baseweb="base-input"],
     .stTextInput input,
@@ -222,7 +237,6 @@ st.markdown("""
         opacity: 0.9 !important;
     }
     
-    /* Input Labels */
     .stTextInput label, 
     div[data-testid="stWidgetLabel"] label, 
     label {
@@ -231,7 +245,7 @@ st.markdown("""
         font-size: 0.9rem !important;
     }
     
-    /* Buttons: Target Streamlit Buttons Only - NEVER Plotly ModeBar Icons */
+    /* Buttons */
     .stButton > button,
     div.stButton > button,
     button[data-testid^="baseButton"],
@@ -243,8 +257,8 @@ st.markdown("""
         border: 1px solid #1E3A8A !important;
         border-radius: 6px !important;
         font-weight: 600 !important;
-        font-size: 0.95rem !important;
-        padding: 0.6rem 1.25rem !important;
+        font-size: 0.92rem !important;
+        padding: 0.55rem 1.25rem !important;
         box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05) !important;
         transition: all 0.15s ease !important;
     }
@@ -266,7 +280,7 @@ st.markdown("""
         -webkit-text-fill-color: #FFFFFF !important;
     }
 
-    /* Reset Plotly ModeBar Icons: Fully Transparent Background & Clear Visible Icons */
+    /* Reset Plotly ModeBar Icons */
     .js-plotly-plot .plotly .modebar-container,
     .modebar-container {
         top: 4px !important;
@@ -279,19 +293,8 @@ st.markdown("""
     button.modebar-btn,
     .modebar-group button {
         background: transparent !important;
-        background-color: transparent !important;
         border: none !important;
         box-shadow: none !important;
-        padding: 4px !important;
-        margin: 0 2px !important;
-        width: 26px !important;
-        height: 26px !important;
-        line-height: normal !important;
-        border-radius: 4px !important;
-        display: inline-flex !important;
-        align-items: center !important;
-        justify-content: center !important;
-        cursor: pointer !important;
     }
     
     .js-plotly-plot .plotly .modebar-btn svg,
@@ -299,26 +302,7 @@ st.markdown("""
         fill: #475569 !important;
         width: 16px !important;
         height: 16px !important;
-        display: block !important;
         opacity: 0.85 !important;
-    }
-    
-    .js-plotly-plot .plotly .modebar-btn:hover,
-    .modebar-btn:hover,
-    button.modebar-btn:hover {
-        background-color: #F1F5F9 !important;
-        border: none !important;
-    }
-    
-    .js-plotly-plot .plotly .modebar-btn:hover svg,
-    .modebar-btn:hover svg {
-        fill: #1E3A8A !important;
-        opacity: 1 !important;
-    }
-    
-    /* Password Eye Icon Visibility */
-    div[data-baseweb="input"] svg {
-        fill: #64748B !important;
     }
 
     /* Tab Switcher Styling */
@@ -346,18 +330,6 @@ st.markdown("""
         color: #1E3A8A !important;
         box-shadow: 0 1px 3px rgba(0,0,0,0.08) !important;
     }
-    
-    /* Chat Input Styling */
-    .stChatInputContainer {
-        border-radius: 8px !important;
-    }
-    
-    .stChatInput textarea {
-        color: #0F172A !important;
-        -webkit-text-fill-color: #0F172A !important;
-        background-color: #FFFFFF !important;
-        font-size: 0.95rem !important;
-    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -379,7 +351,6 @@ df, predictor = load_system()
 
 # User Credentials Database
 ACCOUNTS_DB = {
-    # 1. Executive
     "dean.vance": {
         "password": "admin",
         "name": "Dr. Eleanor Vance",
@@ -387,7 +358,6 @@ ACCOUNTS_DB = {
         "role_title": "University Dean / Provost",
         "scope": "All University Departments & Cohorts"
     },
-    # 2. Faculty
     "prof.sharma": {
         "password": "class",
         "name": "Prof. Arvind Sharma",
@@ -396,7 +366,6 @@ ACCOUNTS_DB = {
         "department": "Computer Science",
         "semester": 5
     },
-    # 3. Student (Default)
     "student.edg1042": {
         "password": "study",
         "name": "Aarav Patel",
@@ -404,7 +373,6 @@ ACCOUNTS_DB = {
         "role_title": "Undergraduate Student",
         "student_id": "EDG-2026-1042"
     },
-    # 4. Parent (Default)
     "parent.edg1042": {
         "password": "family",
         "name": "Mr. & Mrs. Patel",
@@ -418,6 +386,9 @@ ACCOUNTS_DB = {
 if "authenticated" not in st.session_state:
     st.session_state["authenticated"] = False
     st.session_state["user"] = None
+
+if "interventions" not in st.session_state:
+    st.session_state["interventions"] = get_initial_interventions()
 
 if "chat_messages" not in st.session_state:
     st.session_state["chat_messages"] = [
@@ -445,8 +416,11 @@ COLOR_WARNING = "#D97706"
 COLOR_CRITICAL = "#DC2626"
 COLOR_PRIMARY = "#1E3A8A"
 
+# ------------------------------------------------------------------------------
+# 1. LOGIN PORTAL
+# ------------------------------------------------------------------------------
 def render_login_portal():
-    """Renders the secure access portal with username & password."""
+    """Renders the clean, professional institutional login card with 1-click demo buttons."""
     _, login_col, _ = st.columns([1, 1.4, 1])
     
     with login_col:
@@ -473,7 +447,7 @@ def render_login_portal():
                     st.session_state["authenticated"] = True
                     st.session_state["user"] = ACCOUNTS_DB[user_key]
                     st.rerun()
-                # Check dynamic Student ID (e.g. EDG-2026-1005 with password 'study')
+                # Check dynamic Student ID
                 elif user_key.upper() in df['student_id'].values and password_input == "study":
                     sid = user_key.upper()
                     s_name, _ = get_student_identity(sid)
@@ -489,7 +463,7 @@ def render_login_portal():
                     st.error("Invalid credentials. Please verify your User ID and Password.")
                     
         st.markdown("""
-        <div style="margin-top: 1rem; padding-top: 0.75rem; border-top: 1px dashed #CBD5E1; text-align: center;">
+        <div style="margin-top: 1.1rem; padding-top: 0.85rem; border-top: 1px dashed #CBD5E1; text-align: center;">
             <p style="font-size: 0.78rem; font-weight: 600; color: #64748B; margin-bottom: 0.5rem; text-transform: uppercase; letter-spacing: 0.05em;">
                 ⚡ 1-Click Demo Login
             </p>
@@ -518,13 +492,13 @@ def render_login_portal():
                 
         st.markdown("</div>", unsafe_allow_html=True)
 
+# ------------------------------------------------------------------------------
+# 2. ROLE DASHBOARDS
+# ------------------------------------------------------------------------------
 def render_role_dashboard(current_user, filter_dept="All Departments", filter_sem="All Semesters"):
-    """Renders the visual institutional dashboard scoped to the authenticated user's role."""
     user_role = current_user["role"]
 
-    # --------------------------------------------------------------------------
-    # 1. EXECUTIVE / DEAN DATA WINDOW
-    # --------------------------------------------------------------------------
+    # 1. EXECUTIVE / DEAN
     if user_role == "executive":
         exec_df = df.copy()
         if filter_dept != "All Departments":
@@ -614,7 +588,7 @@ def render_role_dashboard(current_user, filter_dept="All Departments", filter_se
             st.plotly_chart(fig1, use_container_width=True)
             
         with c2:
-            st.markdown("##### **Attendance Deficit vs Internal Evaluation Correlation**")
+            st.markdown("##### **Attendance Deficit vs Internal Assessment Correlation**")
             sample_scat = exec_df.sample(min(600, len(exec_df)), random_state=42).copy()
             sample_scat['Status'] = sample_scat['academic_risk_level'].map({0: 'On Track', 1: 'Moderate Risk', 2: 'Critical Risk'})
             
@@ -632,13 +606,37 @@ def render_role_dashboard(current_user, filter_dept="All Departments", filter_se
             fig2.update_layout(legend=dict(orientation="h", yanchor="bottom", y=1.04, xanchor="left", x=0))
             st.plotly_chart(fig2, use_container_width=True)
 
+        # Quick Student Lookup Bar
+        st.markdown("##### **🔍 Instant Student Deep-Dive Search**")
+        search_kw = st.text_input("Quick Search Student by Name or ID:", placeholder="e.g. EDG-2026-1042 or Patel")
+        if search_kw:
+            matched = df[df['student_id'].str.contains(search_kw, case=False) | df['student_name'].str.contains(search_kw, case=False)]
+            if len(matched) > 0:
+                sel_opt = st.selectbox("Select Record to Inspect:", matched['student_id'] + " - " + matched['student_name'])
+                target_sid = sel_opt.split(" - ")[0]
+                s_row = df[df['student_id'] == target_sid].iloc[0]
+                diag = predictor.predict_single(s_row.to_dict())
+                
+                sc1, sc2, sc3, sc4 = st.columns(4)
+                with sc1:
+                    st.metric("Projected GPA", f"{diag['predicted_end_term_gpa']:.2f}", diag['gpa_trajectory'])
+                with sc2:
+                    st.metric("Attendance", f"{s_row['attendance_rate_pct']:.1f}%", "- Deficit" if s_row['attendance_rate_pct'] < 75 else "Good")
+                with sc3:
+                    st.metric("Internal Marks", f"{s_row['internal_assessment_score']:.1f}/100")
+                with sc4:
+                    st.metric("Backlogs", f"{s_row['backlog_count']}")
+                st.caption(f"**Identified Drivers:** {', '.join(diag['key_risk_drivers']) if diag['key_risk_drivers'] else 'None (Consistent standing)'}")
+            else:
+                st.warning("No student matching that query found.")
+
         st.markdown("##### **High-Priority Student Watchlist (For Academic Council Interventions)**")
         at_risk_df = exec_df[exec_df['academic_risk_level'] == 2][
             ['student_id', 'student_name', 'department', 'semester', 'attendance_rate_pct', 'internal_assessment_score', 'backlog_count', 'target_end_term_gpa']
         ].copy()
         at_risk_df.columns = ['ID', 'Student Name', 'Department', 'Sem', 'Attendance %', 'Internal Score', 'Backlogs', 'Forecasted GPA']
         
-        st.dataframe(at_risk_df.head(20), hide_index=True, use_container_width=True, height=280)
+        st.dataframe(at_risk_df.head(25), hide_index=True, use_container_width=True, height=280)
         
         csv_bytes = at_risk_df.to_csv(index=False).encode('utf-8')
         st.download_button(
@@ -648,9 +646,7 @@ def render_role_dashboard(current_user, filter_dept="All Departments", filter_se
             mime='text/csv'
         )
 
-    # --------------------------------------------------------------------------
-    # 2. FACULTY / PROFESSOR DATA WINDOW
-    # --------------------------------------------------------------------------
+    # 2. FACULTY / PROFESSOR
     elif user_role == "faculty":
         f_dept = current_user["department"]
         f_sem = current_user["semester"]
@@ -713,7 +709,6 @@ def render_role_dashboard(current_user, filter_dept="All Departments", filter_se
             class_table = class_df[['student_id', 'student_name', 'attendance_rate_pct', 'assignment_completion_pct', 'internal_assessment_score', 'backlog_count', 'academic_risk_level']].copy()
             class_table.columns = ['Student ID', 'Full Name', 'Attendance %', 'Assignments %', 'Internal (/100)', 'Backlogs', 'Standing']
             class_table['Standing'] = class_table['Standing'].map({0: '🟢 Good Standing', 1: '🟡 Watchlist', 2: '🔴 Critical Risk'})
-            
             st.dataframe(class_table, hide_index=True, use_container_width=True, height=350)
             
         with t_col2:
@@ -733,12 +728,21 @@ def render_role_dashboard(current_user, filter_dept="All Departments", filter_se
             st.info(diag['prescribed_interventions'][0] if diag['prescribed_interventions'] else "Maintain consistent coursework.")
             
             if st.button("📧 Schedule Remedial Peer Tutorial Session"):
+                new_item = create_intervention(
+                    student_id=sel_row['student_id'],
+                    student_name=selected_student,
+                    department=f_dept,
+                    risk_tier="Critical Risk" if diag['risk_level'] == 2 else "Moderate Risk",
+                    intervention_type="Peer Tutoring & Lab Review",
+                    priority="Urgent" if diag['risk_level'] == 2 else "Medium",
+                    assigned_to=current_user['name'],
+                    notes="Assigned following class diagnostic audit."
+                )
+                st.session_state["interventions"].insert(0, new_item)
                 st.success(f"Tutorial alert sent to {selected_student}.")
             st.markdown("</div>", unsafe_allow_html=True)
 
-    # --------------------------------------------------------------------------
-    # 3. STUDENT DATA WINDOW (Self-Service)
-    # --------------------------------------------------------------------------
+    # 3. STUDENT PORTAL
     elif user_role == "student":
         target_sid = current_user["student_id"]
         s_row = df[df['student_id'] == target_sid].iloc[0]
@@ -846,150 +850,7 @@ def render_role_dashboard(current_user, filter_dept="All Departments", filter_se
         for r in diag['prescribed_interventions']:
             st.info(f"💡 {r}")
 
-        # ----------------------------------------------------------------------
-        # Student Passing & Failure Risk Calculator
-        # ----------------------------------------------------------------------
-        st.write("")
-        st.markdown("##### **🎯 Passing & Failure Risk Calculator**")
-        st.caption("Adjust your attendance, internal assessment marks, and weekly study hours below to simulate your real-time passing and failure probabilities.")
-
-        st.markdown('<div class="info-panel" style="padding: 1.5rem 1.8rem; margin-top: 0.5rem; margin-bottom: 1.5rem;">', unsafe_allow_html=True)
-        
-        c_input_col, c_result_col = st.columns([1.1, 1.3], gap="large")
-        
-        with c_input_col:
-            st.markdown("<p style='font-size:0.92rem; font-weight:700; color:#0F172A; margin-bottom:0.75rem;'>⚙️ Adjust Your Performance Parameters:</p>", unsafe_allow_html=True)
-            
-            calc_attendance = st.slider(
-                "Class Attendance Rate (%)",
-                min_value=30.0,
-                max_value=100.0,
-                value=float(s_row['attendance_rate_pct']),
-                step=1.0,
-                help="Institutional minimum compliance threshold is 75%."
-            )
-            
-            calc_internal = st.slider(
-                "Internal Exam Marks (/100)",
-                min_value=10.0,
-                max_value=100.0,
-                value=float(s_row['internal_assessment_score']),
-                step=1.0,
-                help="Continuous assessment, mid-term, and quiz scores."
-            )
-            
-            calc_study_hours = st.slider(
-                "Weekly Study / LMS Hours (hrs/wk)",
-                min_value=1.0,
-                max_value=35.0,
-                value=float(s_row['lms_weekly_hours']),
-                step=0.5,
-                help="Hours dedicated weekly to studying uploaded course materials."
-            )
-            
-            calc_assignment = st.slider(
-                "Assignment Submission Rate (%)",
-                min_value=20.0,
-                max_value=100.0,
-                value=float(s_row['assignment_completion_pct']),
-                step=1.0,
-                help="Percentage of homework and assignments submitted on schedule."
-            )
-            
-        with c_result_col:
-            # Construct feature dictionary reflecting adjusted parameters
-            calc_dict = s_row.to_dict()
-            calc_dict['attendance_rate_pct'] = calc_attendance
-            calc_dict['internal_assessment_score'] = calc_internal
-            calc_dict['lms_weekly_hours'] = calc_study_hours
-            calc_dict['assignment_completion_pct'] = calc_assignment
-            calc_dict['lms_logins_per_week'] = int(calc_study_hours * 1.6)
-            
-            # Real-time ML inference
-            calc_res = predictor.predict_single(calc_dict)
-            
-            fail_prob = float(calc_res['risk_probabilities']['High Risk'])
-            pass_prob = round(100.0 - fail_prob, 1)
-            calc_pred_gpa = calc_res['predicted_end_term_gpa']
-            
-            st.markdown("<p style='font-size:0.92rem; font-weight:700; color:#0F172A; margin-bottom:0.75rem;'>📊 Predicted Academic Outcome:</p>", unsafe_allow_html=True)
-            
-            # Status Indicator
-            if pass_prob >= 80.0:
-                status_html = f'<div class="status-pill pill-safe" style="font-size:0.85rem; padding:0.4rem 0.85rem;">🟢 High Passing Probability ({pass_prob}%) • Safe Standing</div>'
-            elif pass_prob >= 50.0:
-                status_html = f'<div class="status-pill pill-warning" style="font-size:0.85rem; padding:0.4rem 0.85rem;">🟡 Moderate Passing Probability ({pass_prob}%) • Advisory Needed</div>'
-            else:
-                status_html = f'<div class="status-pill pill-critical" style="font-size:0.85rem; padding:0.4rem 0.85rem;">🔴 High Failure Risk ({fail_prob}%) • Critical Action Required</div>'
-            
-            st.markdown(status_html, unsafe_allow_html=True)
-            st.write("")
-            
-            res_c1, res_c2, res_c3 = st.columns(3)
-            with res_c1:
-                st.markdown(f"""
-                <div class="clean-card" style="border-top: 3px solid #16A34A; padding:0.85rem 1rem;">
-                    <div class="card-label">Passing Chance</div>
-                    <div class="card-number" style="color:#16A34A; font-size:1.55rem;">{pass_prob}%</div>
-                    <div class="card-detail">Course Clearance</div>
-                </div>
-                """, unsafe_allow_html=True)
-            with res_c2:
-                st.markdown(f"""
-                <div class="clean-card" style="border-top: 3px solid #DC2626; padding:0.85rem 1rem;">
-                    <div class="card-label">Failing Risk</div>
-                    <div class="card-number" style="color:#DC2626; font-size:1.55rem;">{fail_prob}%</div>
-                    <div class="card-detail">Arrear / Probation Risk</div>
-                </div>
-                """, unsafe_allow_html=True)
-            with res_c3:
-                st.markdown(f"""
-                <div class="clean-card" style="border-top: 3px solid #2563EB; padding:0.85rem 1rem;">
-                    <div class="card-label">Forecasted GPA</div>
-                    <div class="card-number" style="color:#2563EB; font-size:1.55rem;">{calc_pred_gpa:.2f}</div>
-                    <div class="card-detail">Target 10-Pt Benchmark</div>
-                </div>
-                """, unsafe_allow_html=True)
-                
-            # Clean Comparison Chart
-            prob_chart_df = pd.DataFrame({
-                'Outcome': ['Passing Probability', 'Failing Risk'],
-                'Probability (%)': [pass_prob, fail_prob]
-            })
-            fig_calc = px.bar(
-                prob_chart_df,
-                x='Probability (%)',
-                y='Outcome',
-                orientation='h',
-                color='Outcome',
-                color_discrete_map={'Passing Probability': '#16A34A', 'Failing Risk': '#DC2626'},
-                text_auto='.1f',
-                height=160
-            )
-            fig_calc = apply_clean_chart_theme(fig_calc, height=160)
-            fig_calc.update_layout(
-                showlegend=False,
-                xaxis=dict(range=[0, 100], showgrid=True, gridcolor="#F1F5F9"),
-                yaxis=dict(title=None),
-                margin=dict(l=10, r=10, t=10, b=10)
-            )
-            st.plotly_chart(fig_calc, use_container_width=True)
-            
-            # Actionable Feedback
-            if calc_attendance < 75.0:
-                st.warning(f"⚠️ **Attendance Alert:** Your simulated attendance ({calc_attendance:.0f}%) is below the university threshold (75%). Raising it above 75% will dramatically lower your failure probability.")
-            elif calc_internal < 50.0:
-                st.warning(f"⚠️ **Internal Marks Advisory:** Internal score ({calc_internal:.0f}/100) is low. Scoring 60+ on subsequent quizzes/tests creates a comfortable buffer.")
-            elif calc_study_hours < 5.0:
-                st.info(f"💡 **Study Habit:** Increasing study time from {calc_study_hours:.1f} to 8+ hrs/week significantly boosts predicted GPA.")
-            else:
-                st.success("✅ **Optimal Trajectory:** With this combination of attendance, internals, and study hours, you have a strong buffer and high probability of passing with distinction!")
-                
-        st.markdown('</div>', unsafe_allow_html=True)
-
-    # --------------------------------------------------------------------------
-    # 4. PARENT / GUARDIAN DATA WINDOW
-    # --------------------------------------------------------------------------
+    # 4. PARENT PORTAL
     elif user_role == "parent":
         target_sid = current_user["student_id"]
         p_student = df[df['student_id'] == target_sid].iloc[0]
@@ -1054,7 +915,7 @@ def render_role_dashboard(current_user, filter_dept="All Departments", filter_se
             """, unsafe_allow_html=True)
             
         with par_col2:
-            st.markdown("##### **Academic Challenges & Areas Needing Support**")
+            st.markdown("##### **Teacher & Advisor Observations**")
             st.markdown(f"""
             <div class="info-panel">
                 <div class="panel-heading">Teacher & Advisor Observations</div>
@@ -1067,14 +928,248 @@ def render_role_dashboard(current_user, filter_dept="All Departments", filter_se
             if st.button("📞 Request Virtual Consultation with Prof. Arvind Sharma"):
                 st.success("Consultation request logged. Prof. Arvind Sharma will contact you via email within 24 hours.")
 
-# ==============================================================================
-# AI DATA CHATBOT INTERFACE (GROQ OPENAI/GPT-OSS-120B)
-# ==============================================================================
+# ------------------------------------------------------------------------------
+# 3. FEATURE: WHAT-IF & GOAL-SEEK SIMULATOR TAB
+# ------------------------------------------------------------------------------
+def render_simulator_tab(current_user):
+    st.markdown("##### **🎯 Academic Performance & Goal Simulator**")
+    st.caption("Perform forward risk simulation or calculate the exact effort required to achieve your target GPA.")
+    
+    # Select Student Profile
+    if current_user["role"] in ["student", "parent"]:
+        active_student = df[df['student_id'] == current_user['student_id']].iloc[0]
+    else:
+        s_cand = st.selectbox("Select Student to Simulate:", df['student_id'] + " - " + df['student_name'])
+        active_student = df[df['student_id'] == s_cand.split(" - ")[0]].iloc[0]
+        
+    s_dict = active_student.to_dict()
+    cur_diag = predictor.predict_single(s_dict)
+    
+    sim_mode = st.radio("Choose Simulation Mode:", ["🎯 Reverse Goal-Seek (Find required effort for target GPA)", "⚙️ Forward What-If Sliders (Simulate outcomes)"], horizontal=True)
+    
+    if sim_mode.startswith("🎯"):
+        st.write("")
+        g_c1, g_c2 = st.columns([1, 1.4], gap="large")
+        with g_c1:
+            st.markdown(f"**Target GPA for {active_student['student_name']}:**")
+            st.caption(f"Current Baseline: **{cur_diag['predicted_end_term_gpa']:.2f} GPA**")
+            target_val = st.slider("Select Desired End-Term GPA:", 5.0, 9.8, float(min(9.5, round(cur_diag['predicted_end_term_gpa'] + 0.6, 1))), 0.1)
+            
+        with g_c2:
+            opt = optimize_gpa_target(s_dict, target_val, predictor)
+            
+            f_color = COLOR_SAFE if opt['feasibility_score'] >= 80 else (COLOR_WARNING if opt['feasibility_score'] >= 50 else COLOR_CRITICAL)
+            st.markdown(f"""
+            <div class="info-panel" style="border-left: 4px solid {f_color};">
+                <div style="font-weight: 700; font-size: 1.05rem; color: #0F172A; margin-bottom: 0.3rem;">
+                    Feasibility: {opt['status']} ({opt['feasibility_score']}% confidence)
+                </div>
+                <div style="font-size: 0.88rem; color: #475569;">{opt['message']}</div>
+            </div>
+            """, unsafe_allow_html=True)
+            
+            o1, o2, o3 = st.columns(3)
+            with o1:
+                st.metric("Target Attendance", f"{opt['required_attendance']:.1f}%", f"+{opt['attendance_delta']:.1f}%" if opt['attendance_delta'] > 0 else "Steady")
+            with o2:
+                st.metric("Target Internal Score", f"{opt['required_internal']:.1f}/100", f"+{opt['internal_delta']:.1f} pts" if opt['internal_delta'] > 0 else "Steady")
+            with o3:
+                st.metric("LMS Study Time", f"{opt['required_study_hours']:.1f} hrs/wk", f"+{opt['study_delta']:.1f} hrs" if opt['study_delta'] > 0 else "Steady")
+                
+            st.markdown("**Roadmap Steps:**")
+            for step in opt['action_steps']:
+                st.markdown(f"• {step}")
+                
+    else:
+        st.write("")
+        c_input_col, c_result_col = st.columns([1.1, 1.3], gap="large")
+        with c_input_col:
+            calc_attendance = st.slider("Class Attendance Rate (%)", 30.0, 100.0, float(active_student['attendance_rate_pct']), 1.0)
+            calc_internal = st.slider("Internal Exam Marks (/100)", 10.0, 100.0, float(active_student['internal_assessment_score']), 1.0)
+            calc_study_hours = st.slider("Weekly Study / LMS Hours (hrs/wk)", 1.0, 35.0, float(active_student['lms_weekly_hours']), 0.5)
+            calc_assignment = st.slider("Assignment Submission Rate (%)", 20.0, 100.0, float(active_student['assignment_completion_pct']), 1.0)
+            
+        with c_result_col:
+            calc_dict = s_dict.copy()
+            calc_dict['attendance_rate_pct'] = calc_attendance
+            calc_dict['internal_assessment_score'] = calc_internal
+            calc_dict['lms_weekly_hours'] = calc_study_hours
+            calc_dict['assignment_completion_pct'] = calc_assignment
+            calc_dict['lms_logins_per_week'] = int(calc_study_hours * 1.6)
+            
+            calc_res = predictor.predict_single(calc_dict)
+            fail_prob = float(calc_res['risk_probabilities']['High Risk'])
+            pass_prob = round(100.0 - fail_prob, 1)
+            
+            res_c1, res_c2, res_c3 = st.columns(3)
+            with res_c1:
+                st.markdown(f"""
+                <div class="clean-card" style="border-top: 3px solid #16A34A; padding:0.85rem 1rem;">
+                    <div class="card-label">Passing Chance</div>
+                    <div class="card-number" style="color:#16A34A; font-size:1.55rem;">{pass_prob}%</div>
+                    <div class="card-detail">Course Clearance</div>
+                </div>
+                """, unsafe_allow_html=True)
+            with res_c2:
+                st.markdown(f"""
+                <div class="clean-card" style="border-top: 3px solid #DC2626; padding:0.85rem 1rem;">
+                    <div class="card-label">Failing Risk</div>
+                    <div class="card-number" style="color:#DC2626; font-size:1.55rem;">{fail_prob}%</div>
+                    <div class="card-detail">Arrear Risk</div>
+                </div>
+                """, unsafe_allow_html=True)
+            with res_c3:
+                st.markdown(f"""
+                <div class="clean-card" style="border-top: 3px solid #2563EB; padding:0.85rem 1rem;">
+                    <div class="card-label">Forecasted GPA</div>
+                    <div class="card-number" style="color:#2563EB; font-size:1.55rem;">{calc_res['predicted_end_term_gpa']:.2f}</div>
+                    <div class="card-detail">Target 10-Pt Benchmark</div>
+                </div>
+                """, unsafe_allow_html=True)
+                
+            prob_chart_df = pd.DataFrame({
+                'Outcome': ['Passing Probability', 'Failing Risk'],
+                'Probability (%)': [pass_prob, fail_prob]
+            })
+            fig_calc = px.bar(
+                prob_chart_df, x='Probability (%)', y='Outcome', orientation='h', color='Outcome',
+                color_discrete_map={'Passing Probability': '#16A34A', 'Failing Risk': '#DC2626'}, text_auto='.1f', height=160
+            )
+            fig_calc = apply_clean_chart_theme(fig_calc, height=160)
+            fig_calc.update_layout(showlegend=False, xaxis=dict(range=[0, 100]))
+            st.plotly_chart(fig_calc, use_container_width=True)
+
+# ------------------------------------------------------------------------------
+# 4. FEATURE: CAREER PATHWAYS & INTERVENTIONS TAB
+# ------------------------------------------------------------------------------
+def render_career_and_interventions_tab(current_user):
+    user_role = current_user["role"]
+    
+    # If Student or Parent: Focus on Career Pathways & Industry Readiness
+    if user_role in ["student", "parent"]:
+        st.markdown("##### **🧭 Career Pathways & Industry Skill Readiness**")
+        st.caption("AI mapping of student skill count, projects, and GPA against high-demand engineering careers.")
+        
+        active_student = df[df['student_id'] == current_user['student_id']].iloc[0]
+        readiness = evaluate_career_readiness(active_student.to_dict())
+        
+        cp1, cp2, cp3 = st.columns(3)
+        cols = [cp1, cp2, cp3]
+        for i, item in enumerate(readiness['top_tracks']):
+            track = item['track']
+            score = item['match_score']
+            with cols[i]:
+                st.markdown(f"""
+                <div class="clean-card" style="border-top: 3px solid #1E3A8A; min-height: 240px;">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 0.35rem;">
+                        <span class="card-label">Rank #{i+1} Match</span>
+                        <span style="font-weight: 700; color: #16A34A; font-size: 1.1rem;">{score}%</span>
+                    </div>
+                    <div style="font-weight: 700; font-size: 1.05rem; color: #0F172A; margin-bottom: 0.3rem;">{track['title']}</div>
+                    <div style="font-size: 0.8rem; color: #64748B; margin-bottom: 0.6rem;">{track['description']}</div>
+                    <div style="font-size: 0.78rem; font-weight: 600; color: #334155;">Key Competencies:</div>
+                    <div style="font-size: 0.76rem; color: #64748B;">{', '.join(track['key_skills'][:3])}</div>
+                </div>
+                """, unsafe_allow_html=True)
+                
+        st.write("")
+        g1, g2 = st.columns(2)
+        with g1:
+            st.markdown("##### **Identified Skill Gaps & Action Items:**")
+            for g in readiness['gaps']:
+                st.info(f"💡 {g}")
+        with g2:
+            st.markdown("##### **Recommended Industry Certifications:**")
+            for cert in readiness['recommended_certifications']:
+                st.success(f"🎓 **{cert}**")
+
+    # If Executive or Faculty: Focus on Interventions, Letter Generator & Department Benchmarks
+    else:
+        sub_tab1, sub_tab2, sub_tab3 = st.tabs([
+            "📋 Pedagogical Action Tracker",
+            "📜 Official Letter & Notice Generator",
+            "⚖️ Department Benchmarks"
+        ])
+        
+        with sub_tab1:
+            st.markdown("##### **Pedagogical Action & Intervention Log**")
+            with st.expander("➕ **Log New Student Intervention**", expanded=False):
+                ic1, ic2 = st.columns(2)
+                with ic1:
+                    s_pick = st.selectbox("Select Student:", df['student_id'] + " - " + df['student_name'])
+                    i_act = st.selectbox("Intervention Type:", ["Peer Tutoring", "Faculty Counseling", "Attendance Warning Notice", "Parent Conference"])
+                    i_prio = st.selectbox("Priority Tier:", ["Urgent", "High", "Medium", "Low"])
+                with ic2:
+                    assignee = st.text_input("Assigned Mentor / Counselor:", value=current_user['name'])
+                    i_note = st.text_area("Observations:", placeholder="Enter action plan notes...")
+                if st.button("Save Intervention Log"):
+                    sid = s_pick.split(" - ")[0]
+                    sname = s_pick.split(" - ")[1]
+                    s_r = df[df['student_id'] == sid].iloc[0]
+                    new_item = create_intervention(
+                        student_id=sid, student_name=sname, department=s_r['department'],
+                        risk_tier="Critical Risk" if s_r['academic_risk_level'] == 2 else "Moderate Risk",
+                        intervention_type=i_act, priority=i_prio, assigned_to=assignee, notes=i_note
+                    )
+                    st.session_state["interventions"].insert(0, new_item)
+                    st.success(f"Intervention recorded for {sname}!")
+                    st.rerun()
+                    
+            # Display interventions
+            for item in st.session_state["interventions"]:
+                p_c = COLOR_CRITICAL if item['priority'] == "Urgent" else (COLOR_WARNING if item['priority'] == "High" else COLOR_PRIMARY)
+                st.markdown(f"""
+                <div class="info-panel" style="margin-bottom: 0.6rem; padding: 0.85rem 1.1rem;">
+                    <div style="display:flex; justify-content:space-between; align-items:center;">
+                        <strong>{item['student_name']}</strong> ({item['student_id']} • {item['department']})
+                        <span class="status-pill" style="border: 1px solid {p_c}; color: {p_c};">{item['priority']}</span>
+                    </div>
+                    <div style="font-size:0.83rem; color:#475569; margin-top:0.25rem;">
+                        <strong>Action:</strong> {item['intervention_type']} • <em>Assigned to {item['assigned_to']}</em> ({item['status']})
+                    </div>
+                    <div style="font-size:0.8rem; color:#64748B; margin-top:0.2rem;">{item['notes']}</div>
+                </div>
+                """, unsafe_allow_html=True)
+                
+        with sub_tab2:
+            st.markdown("##### **Official Document & Letter Generator**")
+            lc1, lc2 = st.columns([1, 1.6], gap="large")
+            with lc1:
+                s_sel = st.selectbox("Select Recipient Student:", df['student_id'] + " - " + df['student_name'], key="let_s_sel")
+                l_type = st.radio("Notice Type:", [
+                    "Dean's Commendation of Academic Excellence",
+                    "Formal Academic Early-Warning & Attendance Notice",
+                    "Parent Consultation Invitation"
+                ])
+                l_key = "commendation" if "Commendation" in l_type else ("warning" if "Warning" in l_type else "parent")
+                s_name = st.text_input("Signatory Name:", "Dr. Eleanor Vance")
+                s_title = st.text_input("Signatory Title:", "Dean of Academic Affairs")
+            with lc2:
+                s_row = df[df['student_id'] == s_sel.split(" - ")[0]].iloc[0]
+                s_diag = predictor.predict_single(s_row.to_dict())
+                doc_text = generate_academic_letter(l_key, s_row.to_dict(), s_diag, s_name, s_title)
+                st.markdown(f"""<div class="info-panel" style="max-height: 440px; overflow-y: auto;">""", unsafe_allow_html=True)
+                st.markdown(doc_text)
+                st.markdown("</div>", unsafe_allow_html=True)
+                st.download_button("📥 Download Official Letter (.md)", data=doc_text.encode('utf-8'), file_name=f"official_letter_{s_row['student_id']}.md", mime="text/markdown", use_container_width=True)
+
+        with sub_tab3:
+            st.markdown("##### **Departmental Comparative Benchmarks**")
+            dept_df = df.groupby('department').agg(
+                Students=('student_id', 'count'),
+                Attendance=('attendance_rate_pct', 'mean'),
+                Internal_Marks=('internal_assessment_score', 'mean'),
+                Forecasted_GPA=('target_end_term_gpa', 'mean'),
+                Employability=('employability_index', 'mean')
+            ).reset_index()
+            st.dataframe(dept_df.style.format({'Attendance': '{:.1f}%', 'Internal_Marks': '{:.1f}', 'Forecasted_GPA': '{:.2f}', 'Employability': '{:.1f}'}), hide_index=True, use_container_width=True)
+
+# ------------------------------------------------------------------------------
+# 5. AI DATA CHATBOT INTERFACE (GROQ OPENAI/GPT-OSS-120B)
+# ------------------------------------------------------------------------------
 def render_chatbot_interface(current_user, df):
-    """Interactive conversational analytics engine powered by Groq with dynamic custom dataset support and visual exploration."""
     user_role = current_user.get("role", "guest")
     
-    # Session state for custom dataset & model
     if "custom_df" not in st.session_state:
         st.session_state["custom_df"] = None
     if "custom_dataset_name" not in st.session_state:
@@ -1088,263 +1183,83 @@ def render_chatbot_interface(current_user, df):
     active_df = st.session_state["custom_df"] if is_custom else df
     active_name = st.session_state["custom_dataset_name"] if is_custom else "Institutional Student Cohort"
     
-    # Freshly instantiate chatbot on active dataframe (prevents stale caching issues)
     chatbot = EduGrowthChatbot(
         active_df,
         dataset_name=active_name,
         model=st.session_state["selected_model"]
     )
     
-    # Header Banner
+    # Top Banner
     st.markdown(f"""
-    <div style="background: linear-gradient(135deg, #1E3A8A 0%, #1E40AF 50%, #2563EB 100%); border-radius: 10px; padding: 1.25rem 1.5rem; color: #FFFFFF; margin-bottom: 1rem; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.08);">
-        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+    <div style="background: linear-gradient(135deg, #1E3A8A 0%, #1E40AF 50%, #2563EB 100%); border-radius: 8px; padding: 1.1rem 1.4rem; color: #FFFFFF; margin-bottom: 1rem;">
+        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
             <div>
-                <h3 style="margin: 0; color: #FFFFFF; font-weight: 700; font-size: 1.35rem;">💬 EduGrowth AI Data Assistant</h3>
-                <p style="margin: 0.35rem 0 0 0; color: #DBEAFE; font-size: 0.88rem;">
-                    Natural language analytics with verified Pandas execution on default or custom datasets.
-                </p>
+                <h4 style="margin: 0; color: #FFFFFF; font-weight: 700;">💬 EduGrowth AI Data Assistant</h4>
+                <p style="margin: 0.2rem 0 0 0; color: #DBEAFE; font-size: 0.85rem;">Natural language queries with verified Pandas execution.</p>
             </div>
-            <div style="display: flex; gap: 8px; flex-wrap: wrap;">
-                <span style="background-color: rgba(255,255,255,0.18); border: 1px solid rgba(255,255,255,0.3); border-radius: 6px; padding: 0.35rem 0.65rem; font-size: 0.78rem; font-weight: 600;">
+            <div>
+                <span style="background-color: rgba(255,255,255,0.18); border-radius: 4px; padding: 0.25rem 0.55rem; font-size: 0.78rem; font-weight: 600;">
                     ⚡ Groq: {st.session_state['selected_model']}
-                </span>
-                <span style="background-color: rgba(255,255,255,0.18); border: 1px solid rgba(255,255,255,0.3); border-radius: 6px; padding: 0.35rem 0.65rem; font-size: 0.78rem; font-weight: 600;">
-                    📊 Active: {active_name} ({len(active_df):,} Rows × {len(active_df.columns)} Cols)
                 </span>
             </div>
         </div>
     </div>
     """, unsafe_allow_html=True)
 
-    # Top Settings Bar
-    ctrl_col1, ctrl_col2 = st.columns([1.5, 2.5])
-    with ctrl_col1:
-        model_options = ["openai/gpt-oss-120b", "openai/gpt-oss-20b", "qwen/qwen3.8-27b"]
-        current_idx = model_options.index(st.session_state["selected_model"]) if st.session_state["selected_model"] in model_options else 0
-        new_model = st.selectbox(
-            "🧠 AI Inference Model (Groq LPU):",
-            model_options,
-            index=current_idx,
-            help="Select the model powering data inquiries. openai/gpt-oss-120b is the flagship model with maximum reasoning capacity."
-        )
-        if new_model != st.session_state["selected_model"]:
-            st.session_state["selected_model"] = new_model
-            st.rerun()
-
-    # Dataset Source & Upload Controller
-    with st.expander("📁 **Dataset Source & File Upload (Use Default or Upload Your Own CSV/Excel)**", expanded=(st.session_state["dataset_source"] == "custom" and not is_custom)):
+    # Dataset Upload Expander
+    with st.expander("📁 **Dataset Source & File Upload (Use Default or Upload Your Own CSV/Excel)**", expanded=False):
         src_c1, src_c2 = st.columns([1.3, 2.2])
         with src_c1:
-            st.markdown("##### **Select Dataset Source**")
-            src_mode = st.radio(
-                "Source:",
-                ["🏫 Default Institutional Cohort (3,000 Students)", "📤 Upload My Own Dataset (CSV / Excel)"],
-                index=0 if st.session_state["dataset_source"] == "institutional" else 1,
-                label_visibility="collapsed"
-            )
-            
-            if src_mode.startswith("🏫") and st.session_state["dataset_source"] != "institutional":
-                st.session_state["dataset_source"] = "institutional"
-                st.session_state["chat_messages"].append({
-                    "role": "assistant",
-                    "content": "🔄 **Switched active dataset back to Institutional Student Cohort** (3,000 students across 5 engineering departments). You can now ask questions about the institutional cohort.",
-                    "queries": []
-                })
-                st.rerun()
-            elif src_mode.startswith("📤") and st.session_state["dataset_source"] != "custom":
-                st.session_state["dataset_source"] = "custom"
-                st.rerun()
-
-        with src_c2:
-            if st.session_state["dataset_source"] == "custom":
-                st.markdown("##### **Upload Your Custom Dataset**")
-                up_file = st.file_uploader(
-                    "Upload CSV or Excel file",
-                    type=["csv", "xlsx", "xls"],
-                    help="Upload any tabular dataset. The chatbot will dynamically map its schema and answer questions according to your data.",
-                    label_visibility="collapsed"
-                )
-                if up_file is not None:
-                    if st.session_state.get("custom_dataset_name") != up_file.name:
-                        try:
-                            if up_file.name.endswith(".csv"):
-                                try:
-                                    loaded_df = pd.read_csv(up_file, encoding="utf-8")
-                                except UnicodeDecodeError:
-                                    up_file.seek(0)
-                                    loaded_df = pd.read_csv(up_file, encoding="latin1")
-                            else:
-                                loaded_df = pd.read_excel(up_file)
-                                
-                            if len(loaded_df) == 0:
-                                st.warning("⚠️ The uploaded file contains no rows of data.")
-                            else:
-                                st.session_state["custom_df"] = loaded_df
-                                st.session_state["custom_dataset_name"] = up_file.name
-                                cols_preview = ', '.join([f'`{c}`' for c in list(loaded_df.columns)[:6]])
-                                if len(loaded_df.columns) > 6:
-                                    cols_preview += f" ... (+{len(loaded_df.columns)-6} more)"
-                                st.session_state["chat_messages"].append({
-                                    "role": "assistant",
-                                    "content": f"📁 **Custom dataset `{up_file.name}` uploaded and activated!**\n\n- **Dimensions:** {len(loaded_df):,} rows × {len(loaded_df.columns)} columns\n- **Columns detected:** {cols_preview}\n\nI have dynamically analyzed this dataset's schema. You can now ask me anything about this data!",
-                                    "queries": []
-                                })
-                                st.rerun()
-                        except Exception as e:
-                            st.error(f"Error loading file: {str(e)}")
-            else:
-                st.info("Currently querying the pre-loaded **Institutional Student Cohort** (3,000 records). Select **'Upload My Own Dataset'** to analyze custom data.")
-
-        # Preview active custom dataset
-        if is_custom:
-            st.divider()
-            st.markdown(f"**Dataset Preview:** `{active_name}` ({len(active_df):,} rows × {len(active_df.columns)} columns)")
-            st.dataframe(active_df.head(5), use_container_width=True)
-            if st.button("🔄 Reset to Default Institutional Dataset", key="btn_reset_dataset"):
+            src_mode = st.radio("Source:", ["Institutional Cohort (3,000 Students)", "Upload Custom Dataset (CSV/Excel)"], index=0 if not is_custom else 1)
+            if src_mode.startswith("Inst") and is_custom:
                 st.session_state["dataset_source"] = "institutional"
                 st.session_state["custom_df"] = None
                 st.session_state["custom_dataset_name"] = None
                 st.rerun()
+            elif src_mode.startswith("Upload") and not is_custom:
+                st.session_state["dataset_source"] = "custom"
+        with src_c2:
+            if is_custom or src_mode.startswith("Upload"):
+                up_file = st.file_uploader("Upload tabular data", type=["csv", "xlsx", "xls"], label_visibility="collapsed")
+                if up_file is not None and st.session_state.get("custom_dataset_name") != up_file.name:
+                    try:
+                        loaded = pd.read_csv(up_file) if up_file.name.endswith(".csv") else pd.read_excel(up_file)
+                        st.session_state["custom_df"] = loaded
+                        st.session_state["custom_dataset_name"] = up_file.name
+                        st.session_state["dataset_source"] = "custom"
+                        st.success(f"Loaded {up_file.name} ({len(loaded):,} rows)!")
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"Error loading file: {e}")
 
-    # --------------------------------------------------------------------------
-    # Interactive Data Profiler & Visual Studio
-    # --------------------------------------------------------------------------
-    with st.expander("📊 **Interactive Data Profiler & Visual Exploration Studio**", expanded=False):
-        dp_c1, dp_c2, dp_c3, dp_c4 = st.columns(4)
-        total_cells = active_df.shape[0] * active_df.shape[1]
-        null_cells = int(active_df.isnull().sum().sum())
-        completeness = ((total_cells - null_cells) / total_cells * 100) if total_cells else 100.0
-        num_cols = [c for c in active_df.columns if pd.api.types.is_numeric_dtype(active_df[c])]
-        cat_cols = [c for c in active_df.columns if not pd.api.types.is_numeric_dtype(active_df[c])]
-        
-        with dp_c1:
-            st.metric("Total Records", f"{len(active_df):,}")
-        with dp_c2:
-            st.metric("Total Columns", f"{len(active_df.columns)}")
-        with dp_c3:
-            st.metric("Data Completeness", f"{completeness:.1f}%", f"{null_cells} null cells" if null_cells else "0 nulls")
-        with dp_c4:
-            st.metric("Memory Footprint", f"{active_df.memory_usage(deep=True).sum() / 1024:.1f} KB")
-
-        v_tab1, v_tab2, v_tab3, v_tab4 = st.tabs([
-            "📈 Numeric Distribution", 
-            "📊 Categorical Breakdown", 
-            "🔥 Correlation Matrix", 
-            "🔍 Search & Filter Data"
-        ])
-        
-        with v_tab1:
-            if num_cols:
-                col_sel = st.selectbox("Select Numeric Feature to Plot:", num_cols, key="viz_num_sel")
-                fig_dist = px.histogram(
-                    active_df,
-                    x=col_sel,
-                    marginal="box",
-                    nbins=30,
-                    color_discrete_sequence=["#2563EB"],
-                    title=f"Distribution & Spread of {col_sel}",
-                    height=320
-                )
-                fig_dist = apply_clean_chart_theme(fig_dist, height=320)
-                st.plotly_chart(fig_dist, use_container_width=True)
-            else:
-                st.info("No numeric columns detected in this dataset.")
-                
-        with v_tab2:
-            if cat_cols:
-                cat_sel = st.selectbox("Select Categorical Feature to Plot:", cat_cols, key="viz_cat_sel")
-                top_cats = active_df[cat_sel].value_counts().head(12).reset_index()
-                top_cats.columns = [cat_sel, 'Count']
-                fig_bar = px.bar(
-                    top_cats,
-                    x='Count',
-                    y=cat_sel,
-                    orientation='h',
-                    color_discrete_sequence=["#1E3A8A"],
-                    title=f"Top Categories in {cat_sel}",
-                    text_auto=True,
-                    height=320
-                )
-                fig_bar = apply_clean_chart_theme(fig_bar, height=320)
-                fig_bar.update_layout(yaxis=dict(autorange="reversed"))
-                st.plotly_chart(fig_bar, use_container_width=True)
-            else:
-                st.info("No categorical columns detected in this dataset.")
-                
-        with v_tab3:
-            if len(num_cols) >= 2:
-                corr_sub = active_df[num_cols[:15]].corr()
-                fig_corr = px.imshow(
-                    corr_sub,
-                    text_auto=".2f",
-                    color_continuous_scale="RdBu_r",
-                    zmin=-1,
-                    zmax=1,
-                    title="Feature Correlation Matrix (Top 15 Numeric Features)",
-                    height=420
-                )
-                fig_corr = apply_clean_chart_theme(fig_corr, height=420)
-                st.plotly_chart(fig_corr, use_container_width=True)
-            else:
-                st.info("Need at least 2 numeric columns to compute correlations.")
-                
-        with v_tab4:
-            search_query = st.text_input("Filter dataset rows by keyword:", placeholder="Type any search term...")
-            filtered_df = active_df.copy()
-            if search_query:
-                mask = filtered_df.astype(str).apply(lambda row: row.str.contains(search_query, case=False).any(), axis=1)
-                filtered_df = filtered_df[mask]
-            st.dataframe(filtered_df.head(25), use_container_width=True, height=280)
-            csv_export = filtered_df.to_csv(index=False).encode('utf-8')
-            st.download_button(
-                "📥 Download Filtered Slice (.csv)",
-                data=csv_export,
-                file_name="filtered_dataset_slice.csv",
-                mime="text/csv",
-                key="btn_download_filtered"
-            )
-
-    # Suggestion Chips
-    st.markdown("##### **⚡ Quick Analytics Questions & AI Actions**")
-    if is_custom:
-        first_num = num_cols[0] if num_cols else None
-        first_cat = cat_cols[0] if cat_cols else None
-        
-        sample_questions = [
-            f"Provide a comprehensive summary and key trends in this dataset ({active_name}).",
-            f"What is the average, min, and max of `{first_num}`?" if first_num else "What are the key statistical distributions in this dataset?",
-            f"Show the breakdown and counts grouped by `{first_cat}`." if first_cat else "Are there any correlations or patterns across columns?",
-            "Check for missing values, null counts, or anomalies across all columns."
-        ]
-    elif user_role == "executive":
+    # Quick Suggestion Chips
+    if user_role == "executive":
         sample_questions = [
             "Which department has the highest number of critical risk students?",
             "What is the average attendance and forecasted GPA across all 5 departments?",
             "How many students have more than 2 course backlogs?",
-            "List the top 5 students needing immediate intervention with their IDs and departments."
+            "List the top 5 students needing immediate intervention."
         ]
     elif user_role == "faculty":
         dept = current_user.get("department", "Computer Science")
-        sem = current_user.get("semester", 5)
         sample_questions = [
-            f"How many students in {dept} Semester {sem} have attendance below 75%?",
-            f"What is the average internal assessment score and backlog count in {dept}?",
-            f"Show the distribution of risk levels in {dept} Semester {sem}.",
-            f"Who are the top performers in {dept} with highest practical portfolio scores?"
+            f"How many students in {dept} have attendance below 75%?",
+            f"What is the average internal assessment score in {dept}?",
+            f"Show the distribution of risk levels in {dept}.",
+            f"Who are the top performers in {dept}?"
         ]
     elif user_role == "student":
         sid = current_user.get("student_id", "EDG-2026-1042")
         sample_questions = [
             f"Give me a detailed evaluation and diagnostic summary for student {sid}.",
             f"What specific actions can student {sid} take to improve their end-term GPA?",
-            f"How does student {sid}'s attendance and internal score compare to class average?",
+            f"How does student {sid}'s attendance compare to class average?",
             f"What skills and projects should student {sid} add to boost employability?"
         ]
-    else: # Parent
+    else:
         sid = current_user.get("student_id", "EDG-2026-1042")
         sample_questions = [
-            f"How is my child ({sid}) performing academically and what is their attendance?",
+            f"How is my child ({sid}) performing academically?",
             f"Are there any backlogs or critical risk warnings for student {sid}?",
             f"What recommendations should we discuss with the class teacher?",
             f"What are my child's strongest accomplishments this semester?"
@@ -1357,42 +1272,16 @@ def render_chatbot_interface(current_user, df):
             if st.button(f"💡 {q_text}", key=f"quick_q_{idx}", use_container_width=True):
                 selected_quick_prompt = q_text
 
-    # Action row (Export transcript & Clear chat)
-    act_col1, act_col2, act_col3 = st.columns([5, 2, 1.2])
+    # Clear chat & export buttons
+    act_col1, act_col2 = st.columns([6, 1.2])
     with act_col2:
-        # Build Markdown transcript for export
-        report_md = f"# EduGrowth AI Analytics Report\n\n"
-        report_md += f"**Dataset:** {active_name} ({len(active_df):,} rows x {len(active_df.columns)} columns)\n"
-        report_md += f"**Model:** {st.session_state['selected_model']}\n"
-        report_md += f"**User:** {current_user['name']} ({current_user.get('role_title', 'User')})\n\n---\n\n"
-        for m in st.session_state.get("chat_messages", []):
-            role_label = "👤 User" if m["role"] == "user" else "🎓 EduGrowth Assistant"
-            report_md += f"### {role_label}\n{m['content']}\n\n"
-            if m.get("queries"):
-                for q in m["queries"]:
-                    report_md += f"```python\n# Executed Pandas Query\n{q['code']}\n```\n"
-                    report_md += f"```text\n# Query Result\n{q['output']}\n```\n\n"
-        st.download_button(
-            "📥 Export Chat Report (.md)",
-            data=report_md.encode("utf-8"),
-            file_name=f"edugrowth_ai_report_{pd.Timestamp.now().strftime('%Y%m%d_%H%M%S')}.md",
-            mime="text/markdown",
-            use_container_width=True
-        )
-    with act_col3:
         if st.button("🗑️ Clear Chat", use_container_width=True):
             st.session_state["chat_messages"] = [
-                {
-                    "role": "assistant",
-                    "content": f"👋 Conversation cleared! What would you like to analyze about **{active_name}**?",
-                    "queries": []
-                }
+                {"role": "assistant", "content": f"👋 Conversation cleared! What would you like to analyze about **{active_name}**?", "queries": []}
             ]
             st.rerun()
 
-    st.markdown("---")
-    
-    # Render Chat History
+    # Chat History
     for msg in st.session_state.get("chat_messages", []):
         if msg["role"] == "user":
             with st.chat_message("user"):
@@ -1401,81 +1290,50 @@ def render_chatbot_interface(current_user, df):
             with st.chat_message("assistant", avatar="🎓"):
                 st.markdown(msg["content"])
                 if msg.get("queries"):
-                    with st.expander("🔍 View Verified Pandas Query & Dataset Output", expanded=False):
+                    with st.expander("🔍 View Verified Pandas Query & Output", expanded=False):
                         for q in msg["queries"]:
-                            st.caption("**Executed Query (Python):**")
+                            st.caption("**Executed Query:**")
                             st.code(q["code"], language="python")
-                            st.caption("**Computed Dataset Result:**")
+                            st.caption("**Result:**")
                             st.code(q["output"], language="text")
 
-    # Chat Input Handling
+    # Chat Input
     user_input = st.chat_input(f"Ask any question about {active_name}...")
     prompt_to_send = selected_quick_prompt or user_input
     
     if prompt_to_send:
-        # Add user message
-        st.session_state["chat_messages"].append({
-            "role": "user",
-            "content": prompt_to_send
-        })
-        
-        # Display immediately
+        st.session_state["chat_messages"].append({"role": "user", "content": prompt_to_send})
         with st.chat_message("user"):
             st.markdown(prompt_to_send)
             
         with st.chat_message("assistant", avatar="🎓"):
             with st.spinner(f"Analyzing {active_name} with Groq {st.session_state['selected_model']}..."):
-                # Prepare role context
-                if is_custom:
-                    role_ctx = f"Logged in as {current_user.get('name', 'User')} ({current_user.get('role_title', 'User')}). Active dataset: '{active_name}' ({len(active_df):,} rows × {len(active_df.columns)} columns)."
-                elif user_role == "executive":
-                    role_ctx = f"Logged in as {current_user['name']} ({current_user['role_title']}). Access level: Complete institutional portfolio (all 3,000 students)."
-                elif user_role == "faculty":
-                    role_ctx = f"Logged in as {current_user['name']} ({current_user['role_title']}). Assigned Department: {current_user['department']}, Semester: {current_user['semester']}."
-                elif user_role == "student":
-                    role_ctx = f"Logged in as {current_user['name']} (Student ID: {current_user['student_id']})."
-                elif user_role == "parent":
-                    role_ctx = f"Logged in as {current_user['name']} (Guardian of Student ID: {current_user['student_id']})."
-                else:
-                    role_ctx = f"Logged in as {current_user.get('name', 'User')}."
-                    
-                response_dict = chatbot.chat(
-                    messages=st.session_state["chat_messages"],
-                    role_context=role_ctx
-                )
-                
-                content = response_dict.get("content", "No response generated.")
-                queries = response_dict.get("executed_queries", [])
-                
+                role_ctx = f"Logged in as {current_user['name']} ({current_user.get('role_title', 'User')})."
+                res_dict = chatbot.chat(st.session_state["chat_messages"], role_context=role_ctx)
+                content = res_dict.get("content", "No response generated.")
+                queries = res_dict.get("executed_queries", [])
                 st.markdown(content)
                 if queries:
-                    with st.expander("🔍 View Verified Pandas Query & Dataset Output", expanded=False):
+                    with st.expander("🔍 View Verified Pandas Query & Output", expanded=False):
                         for q in queries:
-                            st.caption("**Executed Query (Python):**")
                             st.code(q["code"], language="python")
-                            st.caption("**Computed Dataset Result:**")
                             st.code(q["output"], language="text")
                             
-        st.session_state["chat_messages"].append({
-            "role": "assistant",
-            "content": content,
-            "queries": queries
-        })
+        st.session_state["chat_messages"].append({"role": "assistant", "content": content, "queries": queries})
         st.rerun()
 
-# ==============================================================================
-# AUTHENTICATED PORTAL WINDOW
-# ==============================================================================
+# ------------------------------------------------------------------------------
+# 6. MAIN AUTHENTICATED WINDOW
+# ------------------------------------------------------------------------------
 def render_authenticated_window(current_user):
-    """Renders top navigation tabs: Institutional Dashboard & AI Data Chatbot."""
     user_role = current_user["role"]
     filter_dept = "All Departments"
     filter_sem = "All Semesters"
 
-    # Sidebar - Session Management
+    # Sidebar - Clean Session Management
     with st.sidebar:
         st.markdown("### **EduGrowth AI**")
-        st.caption("Active Session")
+        st.caption("Institutional Active Session")
         
         st.markdown(f"""
         <div style="background-color:#F1F5F9; border-radius:6px; padding:0.75rem 0.9rem; margin-bottom:1rem; border:1px solid #E2E8F0;">
@@ -1516,19 +1374,29 @@ def render_authenticated_window(current_user):
         st.divider()
         st.caption("🔒 Verified Institutional Session | Model v1.0")
 
-    # Main Tab Router
-    tab_dash, tab_chat = st.tabs(["📊 Institutional Dashboard", "🤖 AI Data Chatbot (Groq GPT OSS 120B)"])
+    # Main Tab Navigation - Clean, Simple & Focused
+    tab_dash, tab_sim, tab_adv, tab_chat = st.tabs([
+        "📊 Institutional Dashboard",
+        "🎯 Performance & Goal Simulator",
+        "🧭 Career & Interventions",
+        "🤖 AI Data Chatbot (Groq GPT OSS 120B)"
+    ])
     
     with tab_dash:
         render_role_dashboard(current_user, filter_dept, filter_sem)
         
+    with tab_sim:
+        render_simulator_tab(current_user)
+        
+    with tab_adv:
+        render_career_and_interventions_tab(current_user)
+        
     with tab_chat:
         render_chatbot_interface(current_user, df)
 
-
-# ==============================================================================
+# ------------------------------------------------------------------------------
 # MAIN ROUTER
-# ==============================================================================
+# ------------------------------------------------------------------------------
 if not st.session_state.get("authenticated", False) or not st.session_state.get("user"):
     render_login_portal()
 else:

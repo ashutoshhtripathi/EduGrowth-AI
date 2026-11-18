@@ -15,12 +15,18 @@ import numpy as np
 from dotenv import load_dotenv
 
 # Load environment variables
+dotenv_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), ".env")
+load_dotenv(dotenv_path=dotenv_path)
 load_dotenv()
 
-DEFAULT_GROQ_API_KEY = os.getenv(
-    "GROQ_API_KEY",
-    "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"
-)
+DEFAULT_GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
+if not DEFAULT_GROQ_API_KEY:
+    try:
+        import streamlit as st
+        DEFAULT_GROQ_API_KEY = st.secrets.get("GROQ_API_KEY", "")
+    except Exception:
+        pass
+
 DEFAULT_MODEL = os.getenv("GROQ_MODEL", "openai/gpt-oss-120b")
 GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions"
 
