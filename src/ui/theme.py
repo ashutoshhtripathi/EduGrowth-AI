@@ -105,20 +105,21 @@ def is_dark_mode() -> bool:
 
 
 def get_logo_svg(size: int = 44) -> str:
-    """Returns an ultra-minimal, classic transparent geometric growth crest SVG."""
+    """Returns a minimal, classic EG + AI spark monogram SVG tied to the EduGrowth AI name."""
     return (
         f'<svg width="{size}" height="{size}" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">'
         '<defs>'
-        '<linearGradient id="egM1" x1="8" y1="36" x2="36" y2="10" gradientUnits="userSpaceOnUse">'
-        '<stop offset="0%" stop-color="#2563EB"/><stop offset="100%" stop-color="#38BDF8"/>'
+        '<linearGradient id="egBlue" x1="8" y1="13" x2="22" y2="35" gradientUnits="userSpaceOnUse">'
+        '<stop offset="0%" stop-color="#60A5FA"/><stop offset="100%" stop-color="#2563EB"/>'
         '</linearGradient>'
-        '<linearGradient id="egM2" x1="16" y1="40" x2="40" y2="16" gradientUnits="userSpaceOnUse">'
-        '<stop offset="0%" stop-color="#D97706"/><stop offset="100%" stop-color="#FDE68A"/>'
+        '<linearGradient id="egGold" x1="24" y1="13" x2="42" y2="35" gradientUnits="userSpaceOnUse">'
+        '<stop offset="0%" stop-color="#FDE68A"/><stop offset="55%" stop-color="#F5C451"/><stop offset="100%" stop-color="#D97706"/>'
         '</linearGradient>'
         '</defs>'
-        '<path d="M10 31.5C10 21.8 17.8 14 27.5 14H33" stroke="url(#egM1)" stroke-width="4.2" stroke-linecap="round"/>'
-        '<path d="M15 36C21 36 28.5 31.5 33.5 23.5" stroke="url(#egM2)" stroke-width="4.2" stroke-linecap="round"/>'
-        '<circle cx="36.5" cy="14" r="3.2" fill="#F5C451"/>'
+        '<path d="M20 13H10.5C9.1 13 8 14.1 8 15.5V32.5C8 33.9 9.1 35 10.5 35H20" stroke="url(#egBlue)" stroke-width="3.6" stroke-linecap="round" stroke-linejoin="round"/>'
+        '<path d="M8 24H18" stroke="url(#egBlue)" stroke-width="3.6" stroke-linecap="round"/>'
+        '<path d="M38.5 17.2C37.1 14.4 34.6 13 31.6 13C27.1 13 24 17.3 24 24C24 30.7 27.2 35 31.9 35C36.1 35 39 32.1 39 27.6V24.5H32.5" stroke="url(#egGold)" stroke-width="3.6" stroke-linecap="round" stroke-linejoin="round"/>'
+        '<path d="M41.5 8L42.3 10.7L45 11.5L42.3 12.3L41.5 15L40.7 12.3L38 11.5L40.7 10.7L41.5 8Z" fill="#F5C451"/>'
         '</svg>'
     )
 
