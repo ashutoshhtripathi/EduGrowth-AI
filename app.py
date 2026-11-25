@@ -28,9 +28,11 @@ from ui.parent_portal import render_parent_portal
 from ui.student_portal import render_student_portal
 from ui.theme import inject_global_css
 
+_LOGO_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets", "edugrowth_logo.svg")
+
 st.set_page_config(
     page_title="EduGrowth AI | Institutional Access Portal",
-    page_icon="🎓",
+    page_icon=_LOGO_PATH if os.path.exists(_LOGO_PATH) else "🎓",
     layout="wide",
     initial_sidebar_state="expanded",
 )
@@ -109,16 +111,19 @@ if "interventions" not in st.session_state:
 if "chat_histories" not in st.session_state:
     st.session_state["chat_histories"] = {}
 
+if "dark_mode" not in st.session_state:
+    st.session_state["dark_mode"] = True
+
 
 def main():
     if not st.session_state.get("authenticated", False) or not st.session_state.get("user"):
-        inject_global_css("default", hide_sidebar=True)
+        inject_global_css("default", hide_sidebar=True, login_glass=True)
         render_login_portal(ACCOUNTS_DB, df, get_student_identity)
         return
 
     current_user = st.session_state["user"]
     role = current_user.get("role", "default")
-    inject_global_css(role, hide_sidebar=False)
+    inject_global_css(role, hide_sidebar=False, login_glass=False)
 
     if role == "executive":
         render_executive_portal(current_user, df, predictor)

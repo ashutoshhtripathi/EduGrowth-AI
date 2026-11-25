@@ -156,7 +156,8 @@ def _render_classroom(current_user: dict, class_df: pd.DataFrame, accent: str):
             color_discrete_map={"Doing Well": "#10B981", "Needs Attention": "#F59E0B", "Needs Urgent Help": "#EF4444"},
             height=315,
         )
-        fig_pie.update_layout(margin=dict(l=10, r=10, t=20, b=10), paper_bgcolor="#FFFFFF")
+        fig_pie = apply_clean_chart_theme(fig_pie, height=315)
+        fig_pie.update_layout(margin=dict(l=10, r=10, t=20, b=10))
         st.plotly_chart(fig_pie, width="stretch")
 
     st.markdown("##### **Full Class List**")

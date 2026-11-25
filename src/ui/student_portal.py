@@ -21,6 +21,7 @@ from ui.theme import (
     apply_clean_chart_theme,
     build_student_radar_chart,
     get_role_theme,
+    is_dark_mode,
     render_hero_header,
     render_html,
     render_kpi_card,
@@ -226,6 +227,10 @@ def _render_career_guide(current_user: dict, s_row: pd.Series, accent: str):
 
     readiness = evaluate_career_readiness(s_row.to_dict())
 
+    dark = is_dark_mode()
+    title_col = "#F1F5F9" if dark else "#0F172A"
+    sub_col = "#94A3B8" if dark else "#64748B"
+
     cp1, cp2, cp3 = st.columns(3)
     for col, (i, item) in zip([cp1, cp2, cp3], enumerate(readiness["top_tracks"])):
         track = item["track"]
@@ -239,11 +244,11 @@ def _render_career_guide(current_user: dict, s_row: pd.Series, accent: str):
                 <span class="kpi-label">Top Match #{i+1}</span>
                 <span style="font-weight:800; color:{COLOR_SAFE}; font-size:1.05rem;">{score}% Fit</span>
                 </div>
-                <div style="font-weight:700; font-size:1.05rem; color:#0F172A; margin-bottom:0.35rem;">{track['title']}</div>
+                <div style="font-weight:700; font-size:1.05rem; color:{title_col}; margin-bottom:0.35rem;">{track['title']}</div>
                 <div class="progress-track" style="margin-bottom:0.65rem;">
                 <div class="progress-fill" style="width:{score}%; background:{COLOR_SAFE};"></div>
                 </div>
-                <div style="font-size:0.82rem; color:#64748B; margin-bottom:0.65rem;">{track['description']}</div>
+                <div style="font-size:0.82rem; color:{sub_col}; margin-bottom:0.65rem;">{track['description']}</div>
                 <div>{skill_tags}</div>
                 </div>
                 """

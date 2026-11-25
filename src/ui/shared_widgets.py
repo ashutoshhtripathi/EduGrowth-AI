@@ -16,16 +16,20 @@ from ui.theme import (
     COLOR_SAFE,
     COLOR_WARNING,
     apply_clean_chart_theme,
+    get_logo_svg,
     get_role_theme,
+    is_dark_mode,
     render_html,
     render_kpi_card,
 )
 
 
 def render_sidebar_shell(current_user: dict, nav_options: list[str], nav_state_key: str) -> str:
-    """Renders a sleek, executive-grade sidebar with initials avatar and left-accented nav items."""
+    """Renders a sleek, executive-grade sidebar with the minimal EduGrowth crest, initials avatar, and nav items."""
     role = current_user.get("role", "default")
     theme = get_role_theme(role)
+    dark = is_dark_mode()
+    logo_svg = get_logo_svg(size=32)
 
     if nav_state_key not in st.session_state or st.session_state[nav_state_key] not in nav_options:
         st.session_state[nav_state_key] = nav_options[0]
@@ -42,26 +46,36 @@ def render_sidebar_shell(current_user: dict, nav_options: list[str], nav_state_k
     else:
         initials = "EG"
 
+    title_col = "#F1F5F9" if dark else "#0F172A"
+    sub_col = "#94A3B8" if dark else "#64748B"
+    border_col = "#1E293B" if dark else "#F1F5F9"
+    soft_bg = theme["dark_soft_bg"] if dark else theme["soft_bg"]
+    soft_border = theme["dark_soft_border"] if dark else theme["soft_border"]
+    soft_text = theme["dark_soft_text"] if dark else theme["soft_text"]
+    avatar_bg = "#1E293B" if dark else "#0F172A"
+
+    brand_icon_html = f'<div style="display:flex; align-items:center;">{logo_svg}</div>'
+
     with st.sidebar:
         render_html(
             f"""
-            <div style="display:flex; align-items:center; justify-content:space-between; padding-bottom:0.85rem; margin-bottom:0.85rem; border-bottom:1px solid #F1F5F9;">
+            <div style="display:flex; align-items:center; justify-content:space-between; padding-bottom:0.85rem; margin-bottom:0.85rem; border-bottom:1px solid {border_col};">
             <div style="display:flex; align-items:center; gap:9px;">
-            <div style="width:32px; height:32px; border-radius:8px; background:{theme['gradient']}; color:#FFF; display:flex; align-items:center; justify-content:center; font-size:0.78rem; font-weight:800; letter-spacing:-0.02em;">EG</div>
-            <span style="font-size:0.98rem; font-weight:800; color:#0F172A; letter-spacing:-0.02em;">EduGrowth</span>
+            {brand_icon_html}
+            <span style="font-size:0.98rem; font-weight:800; color:{title_col}; letter-spacing:-0.02em;">EduGrowth</span>
             </div>
-            <span style="background:{theme['soft_bg']}; color:{theme['soft_text']}; border:1px solid {theme['soft_border']}; border-radius:999px; padding:0.15rem 0.55rem; font-size:0.68rem; font-weight:700; text-transform:uppercase; letter-spacing:0.04em;">{theme['portal_name']}</span>
+            <span style="background:{soft_bg}; color:{soft_text}; border:1px solid {soft_border}; border-radius:999px; padding:0.15rem 0.55rem; font-size:0.68rem; font-weight:700; text-transform:uppercase; letter-spacing:0.04em;">{theme['portal_name']}</span>
             </div>
 
             <div style="display:flex; align-items:center; gap:10px; padding:0.45rem 0.2rem 0.95rem 0.2rem; margin-bottom:0.35rem;">
-            <div style="width:34px; height:34px; border-radius:50%; background:#0F172A; color:#FFFFFF; display:flex; align-items:center; justify-content:center; font-size:0.76rem; font-weight:700; flex-shrink:0;">{initials}</div>
+            <div style="width:34px; height:34px; border-radius:50%; background:{avatar_bg}; border:1px solid {border_col}; color:#FFFFFF; display:flex; align-items:center; justify-content:center; font-size:0.76rem; font-weight:700; flex-shrink:0;">{initials}</div>
             <div style="min-width:0;">
-            <div style="font-size:0.86rem; font-weight:700; color:#0F172A; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">{current_user['name']}</div>
-            <div style="font-size:0.73rem; color:#64748B; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">{current_user['role_title']}</div>
+            <div style="font-size:0.86rem; font-weight:700; color:{title_col}; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">{current_user['name']}</div>
+            <div style="font-size:0.73rem; color:{sub_col}; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">{current_user['role_title']}</div>
             </div>
             </div>
 
-            <div style="font-size:0.68rem; font-weight:700; text-transform:uppercase; letter-spacing:0.08em; color:#94A3B8; margin:0 0 0.35rem 0.2rem;">Workspace</div>
+            <div style="font-size:0.68rem; font-weight:700; text-transform:uppercase; letter-spacing:0.08em; color:{sub_col}; margin:0 0 0.35rem 0.2rem;">Workspace</div>
             """
         )
 
@@ -81,13 +95,21 @@ def render_sidebar_shell(current_user: dict, nav_options: list[str], nav_state_k
 
 
 def render_sidebar_footer(current_user: dict):
-    """Renders quiet isolation status and clean sign-out button in the sidebar."""
+    """Renders dark/light mode toggle, isolation status, and clean sign-out button."""
     role = current_user.get("role", "guest")
     theme = get_role_theme(role)
+    dark = is_dark_mode()
+    muted_col = "#94A3B8" if dark else "#64748B"
+
     with st.sidebar:
+        new_dark = st.toggle("🌙 Dark Mode", value=dark, key=f"dark_toggle_{role}")
+        if new_dark != dark:
+            st.session_state["dark_mode"] = new_dark
+            st.rerun()
+
         render_html(
             f"""
-            <div style="font-size:0.74rem; color:#64748B; margin-bottom:0.55rem; padding:0 0.15rem;">
+            <div style="font-size:0.74rem; color:{muted_col}; margin:0.35rem 0 0.55rem 0; padding:0 0.15rem;">
             🔒 Private {theme['portal_name']} chat active
             </div>
             """
@@ -125,14 +147,17 @@ def render_goal_simulator(
     if sim_mode == mode_labels[0]:
         g_c1, g_c2 = st.columns([1, 1.5], gap="large")
         with g_c1:
+            dark = is_dark_mode()
+            txt_col = "#E2E8F0" if dark else "#475569"
+            title_col = "#F1F5F9" if dark else "#0F172A"
             render_html(
                 f"""
                 <div class="surface-panel">
                 <div class="panel-title">🎯 Pick Your Target GPA</div>
-                <div style="font-size:0.88rem; color:#475569; margin-bottom:0.4rem;">
-                Student: <strong>{student_row['student_name']}</strong>
+                <div style="font-size:0.88rem; color:{txt_col}; margin-bottom:0.4rem;">
+                Student: <strong style="color:{title_col};">{student_row['student_name']}</strong>
                 </div>
-                <div style="font-size:0.88rem; color:#475569;">
+                <div style="font-size:0.88rem; color:{txt_col};">
                 Current Expected GPA: <strong style="color:{accent_color}; font-size:1.05rem;">{cur_diag['predicted_end_term_gpa']:.2f} / 10</strong>
                 </div>
                 </div>
@@ -160,14 +185,17 @@ def render_goal_simulator(
                 if opt["feasibility_score"] >= 80
                 else ("Possible with Steady Effort" if opt["feasibility_score"] >= 50 else "Big Jump — Needs Long-Term Plan")
             )
+            dark = is_dark_mode()
+            txt_col = "#CBD5E1" if dark else "#475569"
+            title_col = "#F1F5F9" if dark else "#0F172A"
             render_html(
                 f"""
                 <div class="surface-panel" style="border-left: 4px solid {f_color};">
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.35rem; flex-wrap:wrap; gap:6px;">
-                <span style="font-weight:700; font-size:1.05rem; color:#0F172A;">{friendly_status}</span>
+                <span style="font-weight:700; font-size:1.05rem; color:{title_col};">{friendly_status}</span>
                 <span class="status-pill" style="border:1px solid {f_color}; color:{f_color};">{opt['feasibility_score']}% Chance</span>
                 </div>
-                <div style="font-size:0.88rem; color:#475569;">{opt['message']}</div>
+                <div style="font-size:0.88rem; color:{txt_col};">{opt['message']}</div>
                 </div>
                 """
             )
@@ -270,24 +298,28 @@ def render_goal_simulator(
                     icon="🎯",
                 )
 
+            dark = is_dark_mode()
+            g_bg = "#111827" if dark else "#FFFFFF"
+            g_font = "#E2E8F0" if dark else "#334155"
             gauge = go.Figure(
                 go.Indicator(
                     mode="gauge+number+delta",
                     value=calc_res["predicted_end_term_gpa"],
                     delta={"reference": cur_diag["predicted_end_term_gpa"], "valueformat": ".2f"},
-                    title={"text": "Expected Final GPA (out of 10)", "font": {"size": 14, "color": "#334155"}},
+                    number={"font": {"color": g_font}},
+                    title={"text": "Expected Final GPA (out of 10)", "font": {"size": 14, "color": g_font}},
                     gauge={
-                        "axis": {"range": [0, 10]},
+                        "axis": {"range": [0, 10], "tickcolor": g_font, "tickfont": {"color": g_font}},
                         "bar": {"color": accent_color},
                         "steps": [
-                            {"range": [0, 5.5], "color": "#FEE2E2"},
-                            {"range": [5.5, 7.5], "color": "#FEF3C7"},
-                            {"range": [7.5, 10], "color": "#DCFCE7"},
+                            {"range": [0, 5.5], "color": "rgba(239, 68, 68, 0.25)" if dark else "#FEE2E2"},
+                            {"range": [5.5, 7.5], "color": "rgba(245, 158, 11, 0.25)" if dark else "#FEF3C7"},
+                            {"range": [7.5, 10], "color": "rgba(16, 185, 129, 0.25)" if dark else "#DCFCE7"},
                         ],
                     },
                 )
             )
-            gauge.update_layout(height=255, margin=dict(l=20, r=20, t=45, b=10), paper_bgcolor="#FFFFFF")
+            gauge.update_layout(height=255, margin=dict(l=20, r=20, t=45, b=10), paper_bgcolor=g_bg)
             st.plotly_chart(gauge, width="stretch")
 
 

@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" fill="none">
+  <defs>
+    <linearGradient id="egM1" x1="8" y1="36" x2="36" y2="10" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#2563EB"/>
+      <stop offset="100%" stop-color="#38BDF8"/>
+    </linearGradient>
+    <linearGradient id="egM2" x1="16" y1="40" x2="40" y2="16" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#D97706"/>
+      <stop offset="100%" stop-color="#FDE68A"/>
+    </linearGradient>
+  </defs>
+  <!-- Ultra-minimal architectural rising crest: two balanced sweeping strokes + apex node -->
+  <path d="M10 31.5C10 21.8 17.8 14 27.5 14H33" stroke="url(#egM1)" stroke-width="4.2" stroke-linecap="round"/>
+  <path d="M15 36C21 36 28.5 31.5 33.5 23.5" stroke="url(#egM2)" stroke-width="4.2" stroke-linecap="round"/>
+  <circle cx="36.5" cy="14" r="3.2" fill="#F5C451"/>
+</svg>

@@ -19,7 +19,9 @@ from ui.shared_widgets import (
 from ui.theme import (
     COLOR_CRITICAL,
     COLOR_SAFE,
+    apply_clean_chart_theme,
     get_role_theme,
+    is_dark_mode,
     render_hero_header,
     render_html,
     render_kpi_card,
@@ -133,6 +135,10 @@ def _render_progress_summary(current_user: dict, df: pd.DataFrame, p_student: pd
         )
 
     st.write("")
+    dark = is_dark_mode()
+    c_bg = "#111827" if dark else "#FFFFFF"
+    c_font = "#E2E8F0" if dark else "#334155"
+
     g1, g2 = st.columns([1, 1.15], gap="large")
     with g1:
         st.markdown("##### **Attendance Meter**")
@@ -141,21 +147,21 @@ def _render_progress_summary(current_user: dict, df: pd.DataFrame, p_student: pd
             go.Indicator(
                 mode="gauge+number",
                 value=float(p_student["attendance_rate_pct"]),
-                number={"suffix": "%"},
-                title={"text": "Class Attendance (Goal: 75%+)", "font": {"size": 14, "color": "#334155"}},
+                number={"suffix": "%", "font": {"color": c_font}},
+                title={"text": "Class Attendance (Goal: 75%+)", "font": {"size": 14, "color": c_font}},
                 gauge={
-                    "axis": {"range": [0, 100]},
+                    "axis": {"range": [0, 100], "tickcolor": c_font, "tickfont": {"color": c_font}},
                     "bar": {"color": accent},
                     "threshold": {"line": {"color": COLOR_CRITICAL, "width": 3}, "thickness": 0.75, "value": 75},
                     "steps": [
-                        {"range": [0, 65], "color": "#FEE2E2"},
-                        {"range": [65, 75], "color": "#FEF3C7"},
-                        {"range": [75, 100], "color": "#DCFCE7"},
+                        {"range": [0, 65], "color": "rgba(239, 68, 68, 0.25)" if dark else "#FEE2E2"},
+                        {"range": [65, 75], "color": "rgba(245, 158, 11, 0.25)" if dark else "#FEF3C7"},
+                        {"range": [75, 100], "color": "rgba(16, 185, 129, 0.25)" if dark else "#DCFCE7"},
                     ],
                 },
             )
         )
-        gauge.update_layout(height=275, margin=dict(l=20, r=20, t=45, b=10), paper_bgcolor="#FFFFFF")
+        gauge.update_layout(height=275, margin=dict(l=20, r=20, t=45, b=10), paper_bgcolor=c_bg)
         st.plotly_chart(gauge, width="stretch")
 
     with g2:
@@ -178,17 +184,15 @@ def _render_progress_summary(current_user: dict, df: pd.DataFrame, p_student: pd
         fig_bar = go.Figure(
             data=[
                 go.Bar(name=p_student["student_name"], x=metrics, y=ward_vals, marker_color=accent),
-                go.Bar(name="Branch Average", x=metrics, y=peer_vals, marker_color="#CBD5E1"),
+                go.Bar(name="Branch Average", x=metrics, y=peer_vals, marker_color="#64748B" if dark else "#CBD5E1"),
             ]
         )
+        fig_bar = apply_clean_chart_theme(fig_bar, height=275)
         fig_bar.update_layout(
             barmode="group",
-            height=275,
             margin=dict(l=20, r=20, t=35, b=20),
-            paper_bgcolor="#FFFFFF",
-            plot_bgcolor="#FFFFFF",
-            legend=dict(orientation="h", y=1.12),
-            yaxis=dict(range=[0, 105], gridcolor="#F1F5F9"),
+            legend=dict(orientation="h", y=1.12, font=dict(color=c_font)),
+            yaxis=dict(range=[0, 105]),
         )
         st.plotly_chart(fig_bar, width="stretch")
 
@@ -267,6 +271,10 @@ def _render_planner_and_careers(current_user: dict, p_student: pd.Series, predic
         parent_friendly=True,
     )
 
+    dark = is_dark_mode()
+    title_col = "#F1F5F9" if dark else "#0F172A"
+    sub_col = "#94A3B8" if dark else "#64748B"
+
     st.divider()
     st.markdown(f"##### **Best Future Job Matches for {p_student['student_name']}**")
     readiness = evaluate_career_readiness(p_student.to_dict())
@@ -278,12 +286,12 @@ def _render_planner_and_careers(current_user: dict, p_student: pd.Series, predic
                 f"""
                 <div class="kpi-card" style="border-top:3px solid {accent};">
                 <div class="kpi-label">Match #{i+1}</div>
-                <div style="font-weight:700; font-size:1rem; color:#0F172A;">{track['title']}</div>
+                <div style="font-weight:700; font-size:1rem; color:{title_col};">{track['title']}</div>
                 <div style="font-size:0.84rem; color:{COLOR_SAFE}; font-weight:700; margin:0.35rem 0;">{item['match_score']}% Ready</div>
                 <div class="progress-track" style="margin-bottom:0.55rem;">
                 <div class="progress-fill" style="width:{item['match_score']}%; background:{COLOR_SAFE};"></div>
                 </div>
-                <div style="font-size:0.8rem; color:#64748B;">{track['description']}</div>
+                <div style="font-size:0.8rem; color:{sub_col};">{track['description']}</div>
                 </div>
                 """
             )
