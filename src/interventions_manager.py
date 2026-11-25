@@ -9,7 +9,7 @@ DEFAULT_INTERVENTIONS = [
     {
         "id": "INT-2026-081",
         "student_id": "EDG-2026-1001",
-        "student_name": "Rohan Verma",
+        "student_name": "Tanvi Reddy",
         "department": "Mechanical Eng",
         "risk_tier": "Critical Risk",
         "intervention_type": "Attendance Mandate & Counseling",
@@ -22,7 +22,7 @@ DEFAULT_INTERVENTIONS = [
     {
         "id": "INT-2026-082",
         "student_id": "EDG-2026-1042",
-        "student_name": "Aarav Patel",
+        "student_name": "Rohan Rao",
         "department": "Computer Science",
         "risk_tier": "Moderate Risk",
         "intervention_type": "Peer Mentorship & Lab Support",
@@ -35,7 +35,7 @@ DEFAULT_INTERVENTIONS = [
     {
         "id": "INT-2026-083",
         "student_id": "EDG-2026-1018",
-        "student_name": "Kavya Iyer",
+        "student_name": "Pooja Singh",
         "department": "Electronics & Comm",
         "risk_tier": "Critical Risk",
         "intervention_type": "Backlog Remedial Plan",
@@ -48,7 +48,7 @@ DEFAULT_INTERVENTIONS = [
     {
         "id": "INT-2026-084",
         "student_id": "EDG-2026-1055",
-        "student_name": "Vikram Singh",
+        "student_name": "Kavya Reddy",
         "department": "Information Tech",
         "risk_tier": "Moderate Risk",
         "intervention_type": "Assignment Submission Advisory",

@@ -68,39 +68,39 @@ class EduGrowthPredictor:
         else:
             trajectory = "Stable / Steady"
             
-        # Explainable Root-Cause Diagnostic
+        # Plain-English Diagnostic Drivers & Next Steps
         drivers = []
         interventions = []
         
         if attendance < 65.0:
-            drivers.append(f"Severe attendance deficiency ({attendance:.1f}% vs 75% institutional requirement)")
-            interventions.append("Issue mandatory attendance compliance notice & verify absence reasons with student counselor.")
+            drivers.append(f"Very low class attendance ({attendance:.1f}% — needs to be at least 75%)")
+            interventions.append("Check why classes are being missed and set up a quick meeting with an advisor.")
         elif attendance < 75.0:
-            drivers.append(f"Borderline attendance ({attendance:.1f}%), placing student near probation threshold")
-            interventions.append("Send gentle automated attendance advisory email.")
+            drivers.append(f"Attendance is slightly below the 75% rule ({attendance:.1f}%)")
+            interventions.append("Send a friendly attendance reminder so they stay above 75%.")
             
         if internal_score < 45.0:
-            drivers.append(f"Critically low internal assessment mark ({internal_score:.1f}/100)")
-            interventions.append("Enroll in remedial tutorial sessions & pair with department peer tutor.")
+            drivers.append(f"Low mid-term test marks ({internal_score:.1f} out of 100)")
+            interventions.append("Join extra tutoring sessions and pair with a senior student mentor.")
         elif internal_score < 60.0:
-            drivers.append(f"Below-average internal evaluation score ({internal_score:.1f}/100)")
-            interventions.append("Recommend instructor office-hour review for challenging module concepts.")
+            drivers.append(f"Test marks have room to grow ({internal_score:.1f} out of 100)")
+            interventions.append("Attend teacher office hours to review tough topics before finals.")
             
         if backlogs > 0:
-            drivers.append(f"Accumulated {backlogs} uncleared historical backlog course(s)")
-            interventions.append("Design dedicated backlog clearance timetable prior to end-semester examinations.")
+            drivers.append(f"{backlogs} pending subject(s) from earlier semesters still to clear")
+            interventions.append("Make a simple weekly study schedule to clear pending subjects before final exams.")
             
         if assignment_rate < 60.0:
-            drivers.append(f"High homework delinquency rate: only {assignment_rate:.1f}% submitted on time")
-            interventions.append("Assign an academic success coach to address time-management and deadline tracking.")
+            drivers.append(f"Many assignments submitted late or missed (only {assignment_rate:.1f}% on time)")
+            interventions.append("Use a weekly assignment checklist to finish homework before deadlines.")
             
         if lms_hours < 4.0:
-            drivers.append(f"Minimal LMS digital activity ({lms_hours:.1f} hrs/week logged)")
-            interventions.append("Trigger LMS digital engagement prompts with bite-sized revision quizzes.")
+            drivers.append(f"Very little online study time logged ({lms_hours:.1f} hours/week)")
+            interventions.append("Add short 20-minute daily revision sessions on the learning portal.")
             
         if not drivers:
-            drivers.append("Consistent academic standing across attendance, assessments, and coursework.")
-            interventions.append("Encourage student to pursue honors research projects or advanced certification tracks.")
+            drivers.append("Doing well across attendance, tests, and homework.")
+            interventions.append("Keep up the great pace and explore extra projects or certifications.")
             
         # Practical Portfolio / Employability Score
         portfolio_score = float(df_eng['practical_portfolio_score'].iloc[0])
